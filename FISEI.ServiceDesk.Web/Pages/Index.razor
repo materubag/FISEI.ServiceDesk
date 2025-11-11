@@ -1,0 +1,44 @@
+@page "/"
+@using FISEI.ServiceDesk.Web.Services
+@inject AuthClientService Auth
+@inject NotificacionesService Notif
+@inject HttpClient Http
+
+<h3>Inicio</h3>
+
+@if (!Auth.IsAuthenticated)
+{
+    <p>Debes iniciar sesión. <a href="/login">Ir a Login</a></p>
+}
+else
+{
+    <p>Usuario: @Auth.CurrentUserId (@Auth.CurrentRol)</p>
+    <button class="btn btn-secondary" @onclick="Logout">Logout</button>
+
+    <div class="mt-3">
+        <NotificacionesBadge />
+    </div>
+
+    @if (!Notif.Conectado)
+    {
+        <p>Conectando a notificaciones...</p>
+    }
+}
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Auth.IsAuthenticated && !Notif.Conectado)
+        {
+            await Notif.ConectarAsync("https://localhost:5041/hubs/notificaciones", 
+                () => Task.FromResult(Auth.GetToken()));
+            StateHasChanged();
+        }
+    }
+
+    private void Logout()
+    {
+        Auth.Logout();
+        StateHasChanged();
+    }
+}

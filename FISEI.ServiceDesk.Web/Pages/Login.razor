@@ -1,0 +1,39 @@
+@page "/login"
+@using FISEI.ServiceDesk.Web.Services
+@inject AuthClientService Auth
+@inject NavigationManager Nav
+
+<h3>Login</h3>
+
+@if (error != null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<div class="mb-3">
+    <label>Correo</label>
+    <input class="form-control" @bind="correo" />
+</div>
+<div class="mb-3">
+    <label>Password</label>
+    <input type="password" class="form-control" @bind="password" />
+</div>
+<button class="btn btn-primary" @onclick="DoLogin">Ingresar</button>
+
+@code {
+    private string correo = "estudiante@demo.local";
+    private string password = "demo123";
+    private string? error;
+
+    private async Task DoLogin()
+    {
+        var ok = await Auth.LoginAsync(correo, password);
+        if (!ok)
+        {
+            error = "Login inválido";
+            return;
+        }
+        error = null;
+        Nav.NavigateTo("/");
+    }
+}

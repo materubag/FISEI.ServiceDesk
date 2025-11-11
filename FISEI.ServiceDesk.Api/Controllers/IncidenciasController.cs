@@ -56,6 +56,25 @@ public class IncidenciasController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        var slaDef = await _db.SLA_Definiciones
+    .Where(d => d.Activo && d.PrioridadId == entity.PrioridadId)
+    .OrderByDescending(d => d.Id)
+    .FirstOrDefaultAsync();
+
+        if (slaDef != null)
+        {
+            var ahora = DateTime.UtcNow;
+            _db.SLA_Incidencias.Add(new SLA_Incidencia
+            {
+                IncidenciaId = entity.Id,
+                FechaLimiteRespuesta = ahora.AddHours(slaDef.HorasRespuesta),
+                FechaLimiteResolucion = ahora.AddHours(slaDef.HorasResolucion),
+                CumplidoRespuesta = false,
+                CumplidoResolucion = false,
+                CreadoUtc = ahora
+            });
+            await _db.SaveChangesAsync();
+        }
         // Notificación a Técnicos y Administradores (persistente + tiempo real)
         var tecnicosYAdmins = await _db.Usuarios.Where(u => u.RolId == 2 || u.RolId == 3).Select(u => u.Id).ToListAsync();
         var refCodigo = $"INC-{entity.Id:000000}";
@@ -173,6 +192,8 @@ public class IncidenciasController : ControllerBase
         await _db.SaveChangesAsync();
 
         var refCodigo = $"INC-{id:000000}";
+
+
 
         // Notifica a la contraparte básica (si comenta técnico, notifica al creador; si comenta estudiante y hay técnico asignado, notifícalo)
         var actor = await _db.Usuarios.Where(u => u.Id == dto.UsuarioId).Select(u => new { u.Id, u.RolId }).FirstOrDefaultAsync();
