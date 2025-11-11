@@ -1,0 +1,49 @@
+version: "3.9"
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sd_sql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=SdStrongPass!2025
+    ports:
+      - "14333:1433"
+    volumes:
+      - sd_sql_data:/var/opt/mssql
+    networks:
+      - sd_net
+
+  api:
+    build:
+      context: ./FISEI.ServiceDesk.Api
+      dockerfile: Dockerfile
+    container_name: sd_api
+    environment:
+      - SD_CONNECTION_STRING=Server=sqlserver,1433;Database=ServiceDeskDB;User ID=sa;Password=SdStrongPass!2025;TrustServerCertificate=True;
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - sqlserver
+    ports:
+      - "8080:8080"
+    networks:
+      - sd_net
+
+  web:
+    build:
+      context: ./FISEI.ServiceDesk.Web
+      dockerfile: Dockerfile
+    container_name: sd_web
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - api
+    ports:
+      - "8090:8090"
+    networks:
+      - sd_net
+
+networks:
+  sd_net:
+
+volumes:
+  sd_sql_data:
