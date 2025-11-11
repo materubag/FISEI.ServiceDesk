@@ -1,4 +1,3 @@
-using FISEI.ServiceDesk.Api.Hubs;
 using FISEI.ServiceDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,14 +16,16 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// CORS de desarrollo (ajusta origen según el puerto de tu Blazor Web)
+// Notifier
+builder.Services.AddSingleton<FISEI.ServiceDesk.Api.Services.IRealtimeNotifier, FISEI.ServiceDesk.Api.Services.RealtimeNotifier>();
+
 builder.Services.AddCors(opt =>
 {
     opt.AddPolicy("DevCors", p =>
         p.AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials()
-         .SetIsOriginAllowed(_ => true) // Solo DEV
+         .SetIsOriginAllowed(_ => true)
     );
 });
 
@@ -39,6 +40,6 @@ if (app.Environment.IsDevelopment())
 app.UseCors("DevCors");
 
 app.MapControllers();
-app.MapHub<NotificacionesHub>("/hubs/notificaciones");
+app.MapHub<FISEI.ServiceDesk.Api.Hubs.NotificacionesHub>("/hubs/notificaciones");
 
 app.Run();

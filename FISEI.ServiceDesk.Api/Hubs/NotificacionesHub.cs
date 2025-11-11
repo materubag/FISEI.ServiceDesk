@@ -6,7 +6,7 @@ public class NotificacionesHub : Hub
 {
     public override Task OnConnectedAsync()
     {
-        // Aquí puedes agregar al usuario a grupos por rol/Id si usas auth
+        // TODO: Cuando agregues autenticación, agrega a grupos por usuario/rol
         return base.OnConnectedAsync();
     }
 }
