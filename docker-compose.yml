@@ -1,4 +1,5 @@
-version: "3.9"
+version: "3.8"
+
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -15,12 +16,14 @@ services:
 
   api:
     build:
-      context: ./FISEI.ServiceDesk.Api
-      dockerfile: Dockerfile
+      context: .
+    #  dockerfile: FISEI.ServiceDesk.Api/Dockerfile  # si ya lo tienes así, déjalo
+      dockerfile: FISEI.ServiceDesk.Api/Dockerfile
     container_name: sd_api
     environment:
-      - SD_CONNECTION_STRING=Server=sqlserver,1433;Database=ServiceDeskDB;User ID=sa;Password=SdStrongPass!2025;TrustServerCertificate=True;
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=ServiceDeskDB;User ID=sa;Password=SdStrongPass!2025;TrustServerCertificate=True;
+      - BlazorOrigin=http://localhost:8090
     depends_on:
       - sqlserver
     ports:
@@ -30,11 +33,12 @@ services:
 
   web:
     build:
-      context: ./FISEI.ServiceDesk.Web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: FISEI.ServiceDesk.Web/Dockerfile
     container_name: sd_web
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ApiBaseUrl=http://api:8080
     depends_on:
       - api
     ports:
