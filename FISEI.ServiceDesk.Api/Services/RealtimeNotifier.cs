@@ -14,6 +14,9 @@ public class RealtimeNotifier : IRealtimeNotifier
     public Task NotifyUserAsync(string userId, string message)
         => _hub.Clients.Group($"USER_{userId}").SendAsync("Notificacion", message);
 
+    public Task NotifyUserAsync(int userId, string message)
+        => _hub.Clients.Group($"USER_{userId}").SendAsync("Notificacion", message);
+
     public Task NotifyTecnicosAsync(string message)
         => _hub.Clients.Group("ROL_TECNICO").SendAsync("Notificacion", message);
 }
@@ -21,6 +24,7 @@ public interface IRealtimeNotifier
 {
     Task NotifyAllAsync(string message);
     Task NotifyUserAsync(string userId, string message);
+    Task NotifyUserAsync(int userId, string message);
     Task NotifyTecnicosAsync(string message);
 }
 

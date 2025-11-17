@@ -26,10 +26,13 @@ public class IncidenciasController : ControllerBase
     public async Task<ActionResult<IncidenciaDto>> Crear([FromBody] CreateIncidenciaDto dto)
     {
         // Validaciones mínimas
-        var existeCreador = await _db.Usuarios.AnyAsync(u => u.Id == dto.CreadorId);
-        if (!existeCreador) return BadRequest("CreadorId no existe.");
+        if (!await _db.Usuarios.AnyAsync(u => u.Id == dto.CreadorId))
+            return BadRequest("CreadorId no existe.");
 
-        var estadoReportado = await _db.EstadosIncidencia.Where(e => e.Codigo == "REPORTADO").Select(e => e.Id).FirstAsync();
+        var estadoReportadoId = await _db.EstadosIncidencia
+            .Where(e => e.Codigo == "REPORTADO")
+            .Select(e => e.Id)
+            .FirstAsync();
 
         var entity = new Incidencia
         {
@@ -38,7 +41,7 @@ public class IncidenciasController : ControllerBase
             Descripcion = dto.Descripcion,
             PrioridadId = dto.PrioridadId,
             ServicioId = dto.ServicioId,
-            EstadoId = estadoReportado
+            EstadoId = estadoReportadoId
         };
 
         _db.Incidencias.Add(entity);
@@ -50,18 +53,17 @@ public class IncidenciasController : ControllerBase
             IncidenciaId = entity.Id,
             UsuarioId = dto.CreadorId,
             EstadoAnteriorId = null,
-            EstadoNuevoId = estadoReportado,
+            EstadoNuevoId = estadoReportadoId,
             Comentario = "Incidencia creada"
         });
 
-        await _db.SaveChangesAsync();
-
+        // SLA (usa definición por prioridad — puedes añadir filtrado por servicio si hay reglas específicas)
         var slaDef = await _db.SLA_Definiciones
-    .Where(d => d.Activo && d.PrioridadId == entity.PrioridadId)
-    .OrderByDescending(d => d.Id)
-    .FirstOrDefaultAsync();
+            .Where(d => d.Activo && d.PrioridadId == entity.PrioridadId)
+            .OrderByDescending(d => d.Id)
+            .FirstOrDefaultAsync();
 
-        if (slaDef != null)
+        if (slaDef is not null)
         {
             var ahora = DateTime.UtcNow;
             _db.SLA_Incidencias.Add(new SLA_Incidencia
@@ -73,10 +75,14 @@ public class IncidenciasController : ControllerBase
                 CumplidoResolucion = false,
                 CreadoUtc = ahora
             });
-            await _db.SaveChangesAsync();
         }
-        // Notificación a Técnicos y Administradores (persistente + tiempo real)
-        var tecnicosYAdmins = await _db.Usuarios.Where(u => u.RolId == 2 || u.RolId == 3).Select(u => u.Id).ToListAsync();
+
+        // Notificaciones a técnicos y administradores
+        var tecnicosYAdmins = await _db.Usuarios
+            .Where(u => u.RolId == 2 || u.RolId == 3)
+            .Select(u => u.Id)
+            .ToListAsync();
+
         var refCodigo = $"INC-{entity.Id:000000}";
         foreach (var uid in tecnicosYAdmins)
         {
@@ -88,9 +94,9 @@ public class IncidenciasController : ControllerBase
                 Mensaje = $"Nueva incidencia {refCodigo}: {entity.Titulo}"
             });
         }
-        await _db.SaveChangesAsync();
 
-        await _notifier.NotifyAllAsync($"Nueva incidencia {refCodigo}");
+        await _db.SaveChangesAsync();
+        await _notifier.NotifyTecnicosAsync($"Nueva incidencia {refCodigo}");
 
         var result = new IncidenciaDto
         {
@@ -109,12 +115,12 @@ public class IncidenciasController : ControllerBase
         return CreatedAtAction(nameof(ObtenerMias), new { usuarioId = dto.CreadorId }, result);
     }
 
-    // GET /api/incidencias/mias?usuarioId=GUID
+    // GET /api/incidencias/mias?usuarioId=#
     [HttpGet("mias")]
-    public async Task<ActionResult<IEnumerable<IncidenciaDto>>> ObtenerMias([FromQuery] Guid usuarioId)
+    public async Task<ActionResult<IEnumerable<IncidenciaDto>>> ObtenerMias([FromQuery] int usuarioId)
     {
-        var query = _db.Incidencias
-            .Where(i => i.CreadorId == usuarioId)
+        var list = await _db.Incidencias
+            .Where(i => i.CreadorId == usuarioId && i.Activo)
             .OrderByDescending(i => i.Id)
             .Select(i => new IncidenciaDto
             {
@@ -128,25 +134,27 @@ public class IncidenciasController : ControllerBase
                 CreadorId = i.CreadorId,
                 TecnicoAsignadoId = i.TecnicoAsignadoId,
                 FechaCreacion = i.FechaCreacion
-            });
+            })
+            .ToListAsync();
 
-        var list = await query.ToListAsync();
         return Ok(list);
     }
 
     // PATCH /api/incidencias/{id}/estado
-    [HttpPatch("{id:long}/estado")]
-    public async Task<ActionResult> CambiarEstado([FromRoute] long id, [FromBody] CambiarEstadoDto dto)
+    [HttpPatch("{id:int}/estado")]
+    public async Task<ActionResult> CambiarEstado([FromRoute] int id, [FromBody] CambiarEstadoDto dto)
     {
         var inc = await _db.Incidencias.FindAsync(id);
-        if (inc is null) return NotFound();
+        if (inc is null || !inc.Activo) return NotFound();
 
         var estadoAnterior = inc.EstadoId;
         inc.CambiarEstado(dto.NuevoEstadoId);
-        if (dto.NuevoEstadoId == await _db.EstadosIncidencia.Where(e => e.Codigo == "RESUELTO").Select(e => e.Id).FirstAsync())
-            inc.FechaResolucion = DateTime.UtcNow;
+        inc.FechaUltimoCambio = DateTime.UtcNow;
 
-        await _db.SaveChangesAsync();
+        // Si pasa a RESUELTO registrar FechaResolucion
+        var estadoResueltoId = await _db.EstadosIncidencia.Where(e => e.Codigo == "RESUELTO").Select(e => e.Id).FirstAsync();
+        if (dto.NuevoEstadoId == estadoResueltoId)
+            inc.FechaResolucion = DateTime.UtcNow;
 
         _db.Seguimientos.Add(new Seguimiento
         {
@@ -156,11 +164,8 @@ public class IncidenciasController : ControllerBase
             EstadoNuevoId = dto.NuevoEstadoId,
             Comentario = dto.Comentario
         });
-        await _db.SaveChangesAsync();
 
         var refCodigo = $"INC-{inc.Id:000000}";
-
-        // Notificación al creador
         _db.Notificaciones.Add(new Notificacion
         {
             UsuarioDestinoId = inc.CreadorId,
@@ -168,38 +173,37 @@ public class IncidenciasController : ControllerBase
             Referencia = refCodigo,
             Mensaje = $"Tu incidencia {refCodigo} cambió de estado."
         });
-        await _db.SaveChangesAsync();
 
-        await _notifier.NotifyAllAsync($"Incidencia {refCodigo} cambió de estado");
+        await _db.SaveChangesAsync();
+        await _notifier.NotifyUserAsync(inc.CreadorId, $"Incidencia {refCodigo} cambió de estado");
 
         return NoContent();
     }
 
     // POST /api/incidencias/{id}/comentarios
-    [HttpPost("{id:long}/comentarios")]
-    public async Task<ActionResult> AgregarComentario([FromRoute] long id, [FromBody] CreateComentarioDto dto)
+    [HttpPost("{id:int}/comentarios")]
+    public async Task<ActionResult> AgregarComentario([FromRoute] int id, [FromBody] CreateComentarioDto dto)
     {
         var inc = await _db.Incidencias.FindAsync(id);
-        if (inc is null) return NotFound();
+        if (inc is null || !inc.Activo) return NotFound();
 
-        _db.ComentariosIncidencia.Add(new ComentarioIncidencia
+        _db.ComentariosIncidencia.Add(new FISEI.ServiceDesk.Domain.Entities.ComentarioIncidencia
         {
             IncidenciaId = id,
             UsuarioId = dto.UsuarioId,
             Texto = dto.Texto,
             EsInterno = dto.EsInterno
         });
-        await _db.SaveChangesAsync();
 
         var refCodigo = $"INC-{id:000000}";
+        var actor = await _db.Usuarios
+            .Where(u => u.Id == dto.UsuarioId)
+            .Select(u => new { u.Id, u.RolId })
+            .FirstOrDefaultAsync();
 
-
-
-        // Notifica a la contraparte básica (si comenta técnico, notifica al creador; si comenta estudiante y hay técnico asignado, notifícalo)
-        var actor = await _db.Usuarios.Where(u => u.Id == dto.UsuarioId).Select(u => new { u.Id, u.RolId }).FirstOrDefaultAsync();
-        if (actor is not null)
+        if (actor != null)
         {
-            if (actor.RolId == 2 || actor.RolId == 3) // técnico o admin
+            if (actor.RolId == 2 || actor.RolId == 3) // Técnico/Admin comenta → notifica al creador
             {
                 _db.Notificaciones.Add(new Notificacion
                 {
@@ -209,7 +213,7 @@ public class IncidenciasController : ControllerBase
                     Mensaje = $"Nuevo comentario en {refCodigo}"
                 });
             }
-            else // estudiante
+            else // Estudiante comenta → notifica al técnico asignado (si existe)
             {
                 if (inc.TecnicoAsignadoId.HasValue)
                 {
@@ -222,9 +226,9 @@ public class IncidenciasController : ControllerBase
                     });
                 }
             }
-            await _db.SaveChangesAsync();
         }
 
+        await _db.SaveChangesAsync();
         await _notifier.NotifyAllAsync($"Nuevo comentario en {refCodigo}");
 
         return NoContent();

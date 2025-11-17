@@ -1,10 +1,8 @@
-using System;
-
 namespace FISEI.ServiceDesk.Domain.Entities;
 
 public class Usuario
 {
-    public Guid Id { get; set; }         
+    public int Id { get; set; } // IDENTITY
     public string Nombre { get; set; } = default!;
     public string Correo { get; set; } = default!;
     public string PasswordHash { get; set; } = default!;

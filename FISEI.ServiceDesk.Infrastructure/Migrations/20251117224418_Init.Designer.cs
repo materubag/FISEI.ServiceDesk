@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FISEI.ServiceDesk.Infrastructure.Migrations
 {
     [DbContext(typeof(ServiceDeskDbContext))]
-    [Migration("20251111033800_CoreEntities")]
-    partial class CoreEntities
+    [Migration("20251117224418_Init")]
+    partial class Init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -67,31 +67,59 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.ComentarioIncidencia", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("EsInterno")
                         .HasColumnType("bit");
 
                     b.Property<DateTime>("Fecha")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
-                    b.Property<long>("IncidenciaId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("IncidenciaId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Texto")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.ToTable("ComentariosIncidencia");
+                });
+
+            modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Escalacion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IncidenciaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Nivel")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Escalaciones");
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.EstadoIncidencia", b =>
@@ -159,26 +187,28 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.FeedbackIncidencia", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Comentario")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("Fecha")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
-                    b.Property<long>("IncidenciaId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("IncidenciaId")
+                        .HasColumnType("int");
 
                     b.Property<byte>("Puntuacion")
                         .HasColumnType("tinyint");
 
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -187,11 +217,11 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Incidencia", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Activo")
                         .HasColumnType("bit");
@@ -199,8 +229,8 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.Property<bool>("Cerrada")
                         .HasColumnType("bit");
 
-                    b.Property<Guid>("CreadorId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("CreadorId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Descripcion")
                         .IsRequired()
@@ -210,13 +240,17 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<DateTime>("FechaCreacion")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
                     b.Property<DateTime?>("FechaResolucion")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("FechaUltimoCambio")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
                     b.Property<int>("PrioridadId")
                         .HasColumnType("int");
@@ -224,8 +258,8 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.Property<int>("ServicioId")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("TecnicoAsignadoId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int?>("TecnicoAsignadoId")
+                        .HasColumnType("int");
 
                     b.Property<string>("Titulo")
                         .IsRequired()
@@ -239,14 +273,16 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Notificacion", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("Fecha")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
                     b.Property<bool>("Leida")
                         .HasColumnType("bit");
@@ -256,14 +292,15 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Referencia")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Tipo")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("UsuarioDestinoId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("UsuarioDestinoId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -357,13 +394,108 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.SLA_Definicion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("HorasResolucion")
+                        .HasColumnType("int");
+
+                    b.Property<int>("HorasRespuesta")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrioridadId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ServicioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SLA_Definiciones");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            HorasResolucion = 72,
+                            HorasRespuesta = 24,
+                            PrioridadId = 1
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            HorasResolucion = 48,
+                            HorasRespuesta = 12,
+                            PrioridadId = 2
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            HorasResolucion = 24,
+                            HorasRespuesta = 4,
+                            PrioridadId = 3
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            HorasResolucion = 8,
+                            HorasRespuesta = 2,
+                            PrioridadId = 4
+                        });
+                });
+
+            modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.SLA_Incidencia", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreadoUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
+
+                    b.Property<bool>("CumplidoResolucion")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("CumplidoRespuesta")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaLimiteResolucion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaLimiteRespuesta")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IncidenciaId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SLA_Incidencias");
+                });
+
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Seguimiento", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Comentario")
                         .HasColumnType("nvarchar(max)");
@@ -371,17 +503,19 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.Property<int?>("EstadoAnteriorId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("EstadoNuevoId")
+                    b.Property<int>("EstadoNuevoId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("Fecha")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
-                    b.Property<long>("IncidenciaId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("IncidenciaId")
+                        .HasColumnType("int");
 
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -450,9 +584,11 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Usuario", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Activo")
                         .HasColumnType("bit");
@@ -462,13 +598,19 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("FechaRegistro")
-                        .HasColumnType("datetime2");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("SYSUTCDATETIME()");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PasswordSalt")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -485,32 +627,35 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.HasData(
                         new
                         {
-                            Id = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"),
+                            Id = 1,
                             Activo = true,
                             Correo = "estudiante@demo.local",
-                            FechaRegistro = new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(7738),
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Nombre = "Estudiante Demo",
-                            PasswordHash = "hash",
+                            PasswordHash = "REEMPLAZA_HASH",
+                            PasswordSalt = "REEMPLAZA_SALT",
                             RolId = 1
                         },
                         new
                         {
-                            Id = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"),
+                            Id = 2,
                             Activo = true,
                             Correo = "tecnico@demo.local",
-                            FechaRegistro = new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(8681),
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Nombre = "Tecnico Demo",
-                            PasswordHash = "hash",
+                            PasswordHash = "REEMPLAZA_HASH",
+                            PasswordSalt = "REEMPLAZA_SALT",
                             RolId = 2
                         },
                         new
                         {
-                            Id = new Guid("cccccccc-cccc-cccc-cccc-ccccccccccc3"),
+                            Id = 3,
                             Activo = true,
                             Correo = "admin@demo.local",
-                            FechaRegistro = new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(8684),
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Nombre = "Admin Demo",
-                            PasswordHash = "hash",
+                            PasswordHash = "REEMPLAZA_HASH",
+                            PasswordSalt = "REEMPLAZA_SALT",
                             RolId = 3
                         });
                 });

@@ -1,10 +1,8 @@
-using System;
-
 namespace FISEI.ServiceDesk.Application.DTOs.Auth;
 
 public class LoginResponseDto
 {
-    public Guid UserId { get; set; }
+    public int UserId { get; set; }
     public string Nombre { get; set; } = default!;
     public string Rol { get; set; } = default!;
     public string Token { get; set; } = default!;

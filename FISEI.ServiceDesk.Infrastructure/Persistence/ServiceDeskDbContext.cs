@@ -24,87 +24,35 @@ public class ServiceDeskDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Índices y configuraciones simples
-        modelBuilder.Entity<Usuario>()
-            .HasIndex(u => u.Correo)
-            .IsUnique();
+        // Índices / constraints
+        modelBuilder.Entity<Usuario>().HasIndex(u => u.Correo).IsUnique();
+        modelBuilder.Entity<Incidencia>().Property(i => i.Titulo).HasMaxLength(200);
+        modelBuilder.Entity<EstadoIncidencia>().HasIndex(e => e.Codigo).IsUnique();
 
-        modelBuilder.Entity<Incidencia>()
-            .Property(i => i.Titulo)
-            .HasMaxLength(200);
+        // Defaults SQL para timestamps
+        modelBuilder.Entity<Usuario>().Property(u => u.FechaRegistro).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<Incidencia>().Property(i => i.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<Incidencia>().Property(i => i.FechaUltimoCambio).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<Seguimiento>().Property(s => s.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<ComentarioIncidencia>().Property(c => c.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<FeedbackIncidencia>().Property(f => f.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<Notificacion>().Property(n => n.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<SLA_Incidencia>().Property(s => s.CreadoUtc).HasDefaultValueSql("SYSUTCDATETIME()");
 
-        modelBuilder.Entity<EstadoIncidencia>()
-            .HasIndex(e => e.Codigo)
-            .IsUnique();
-
-        modelBuilder.Entity<Usuario>()
-            .Property(u => u.FechaRegistro)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Incidencia>()
-            .Property(i => i.FechaCreacion)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Incidencia>()
-            .Property(i => i.FechaUltimoCambio)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Seguimiento>()
-            .Property(s => s.Fecha)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<ComentarioIncidencia>()
-            .Property(c => c.Fecha)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<FeedbackIncidencia>()
-            .Property(f => f.Fecha)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<Notificacion>()
-            .Property(n => n.Fecha)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-        modelBuilder.Entity<SLA_Incidencia>()
-            .Property(s => s.CreadoUtc)
-            .HasDefaultValueSql("SYSUTCDATETIME()");
-
-        var estudianteId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1");
-        var tecnicoId    = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2");
-        var adminId      = Guid.Parse("cccccccc-cccc-cccc-cccc-ccccccccccc3");
-        var seedDate     = new DateTime(2025, 01, 01, 0, 0, 0, DateTimeKind.Utc);
-
+        // Seeds
         modelBuilder.Entity<Rol>().HasData(
             new Rol { Id = 1, Nombre = "Estudiante" },
             new Rol { Id = 2, Nombre = "Tecnico" },
             new Rol { Id = 3, Nombre = "Administrador" }
         );
 
-        // ÚNICO bloque de Usuario (reemplaza HASH_REAL/SALT_REAL por valores generados)
+        var seedDate = new DateTime(2025, 01, 01, 0, 0, 0, DateTimeKind.Utc);
+        const string HASH = "REEMPLAZA_HASH"; // genera con tu PasswordHasher
+        const string SALT = "REEMPLAZA_SALT";
         modelBuilder.Entity<Usuario>().HasData(
-            new Usuario {
-                Id = estudianteId,
-                Nombre = "Estudiante Demo",
-                Correo = "estudiante@demo.local",
-                PasswordHash = "HASH_REAL",
-                PasswordSalt = "SALT_REAL",
-                RolId = 1,
-                Activo = true,
-                FechaRegistro = seedDate
-            },
-            new Usuario {
-                Id = tecnicoId,
-                Nombre = "Tecnico Demo",
-                Correo = "tecnico@demo.local",
-                PasswordHash = "HASH_REAL",
-                PasswordSalt = "SALT_REAL",
-                RolId = 2,
-                Activo = true,
-                FechaRegistro = seedDate
-            },
-            new Usuario {
-                Id = adminId,
-                Nombre = "Admin Demo",
-                Correo = "admin@demo.local",
-                PasswordHash = "HASH_REAL",
-                PasswordSalt = "SALT_REAL",
-                RolId = 3,
-                Activo = true,
-                FechaRegistro = seedDate
-            }
+            new Usuario { Id = 1, Nombre = "Estudiante Demo", Correo = "estudiante@demo.local", PasswordHash = HASH, PasswordSalt = SALT, RolId = 1, Activo = true, FechaRegistro = seedDate },
+            new Usuario { Id = 2, Nombre = "Tecnico Demo",    Correo = "tecnico@demo.local",    PasswordHash = HASH, PasswordSalt = SALT, RolId = 2, Activo = true, FechaRegistro = seedDate },
+            new Usuario { Id = 3, Nombre = "Admin Demo",      Correo = "admin@demo.local",      PasswordHash = HASH, PasswordSalt = SALT, RolId = 3, Activo = true, FechaRegistro = seedDate }
         );
 
         modelBuilder.Entity<EstadoIncidencia>().HasData(

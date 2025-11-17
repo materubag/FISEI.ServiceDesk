@@ -79,7 +79,7 @@ public class IncidenciasExtraController : ControllerBase
         public string Descripcion { get; set; } = default!;
         public int PrioridadId { get; set; }
         public int ServicioId { get; set; }
-        public Guid? TecnicoAsignadoId { get; set; }
+        public int? TecnicoAsignadoId { get; set; }
     }
 
     [HttpPut("{id:long}")]

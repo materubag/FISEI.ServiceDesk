@@ -29,9 +29,7 @@ public class AuthController : ControllerBase
     {
         var user = await _db.Usuarios.FirstOrDefaultAsync(u => u.Correo == dto.Correo && u.Activo);
         if (user is null) return Unauthorized("Credenciales inválidas");
-
-        if (!PasswordHasher.Verify(dto.Password, user.PasswordHash, user.PasswordSalt))
-            return Unauthorized("Credenciales inválidas");
+        if (!PasswordHasher.Verify(dto.Password, user.PasswordHash, user.PasswordSalt)) return Unauthorized("Credenciales inválidas");
 
         var rol = await _db.Roles.FindAsync(user.RolId);
         if (rol is null) return Unauthorized("Rol inválido");
@@ -44,6 +42,7 @@ public class AuthController : ControllerBase
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Role, rol.Nombre),
             new Claim("name", user.Nombre),
             new Claim("correo", user.Correo)
@@ -75,7 +74,7 @@ public class AuthController : ControllerBase
         var (hash, salt) = PasswordHasher.HashPassword(dto.Password);
         var user = new Usuario
         {
-            Id = Guid.NewGuid(),
+            // Id autogenerado (IDENTITY)
             Nombre = nombre,
             Correo = dto.Correo,
             PasswordHash = hash,

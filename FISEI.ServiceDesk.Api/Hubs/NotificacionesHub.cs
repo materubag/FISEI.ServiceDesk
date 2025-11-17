@@ -10,12 +10,11 @@ public class NotificacionesHub : Hub
         var user = Context.User;
         if (user?.Identity?.IsAuthenticated == true)
         {
-            var userId = user.FindFirstValue(ClaimTypes.NameIdentifier) 
-                         ?? user.FindFirstValue(ClaimTypes.Name) // fallback
-                         ?? user.FindFirst("sub")?.Value;
-
-            if (!string.IsNullOrEmpty(userId))
+            var sub = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub")?.Value;
+            if (int.TryParse(sub, out var userId))
+            {
                 await Groups.AddToGroupAsync(Context.ConnectionId, $"USER_{userId}");
+            }
 
             var role = user.FindFirstValue(ClaimTypes.Role);
             if (role == "Tecnico" || role == "Administrador")

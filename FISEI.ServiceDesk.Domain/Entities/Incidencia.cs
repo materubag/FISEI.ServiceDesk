@@ -1,26 +1,26 @@
-using System;
-
 namespace FISEI.ServiceDesk.Domain.Entities;
 
 public class Incidencia
 {
-    public long Id { get; set; }
-    public Guid CreadorId { get; set; }
-    public Guid? TecnicoAsignadoId { get; set; }
-    public int ServicioId { get; set; }
-    public int PrioridadId { get; set; }
-    public int EstadoId { get; set; }
+    public int Id { get; set; }
     public string Titulo { get; set; } = default!;
     public string Descripcion { get; set; } = default!;
-    public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
-    public DateTime FechaUltimoCambio { get; set; } = DateTime.UtcNow;
+    public int EstadoId { get; set; }
+    public int PrioridadId { get; set; }
+    public int ServicioId { get; set; }
+    public int CreadorId { get; set; }
+    public int? TecnicoAsignadoId { get; set; }
+    public DateTime FechaCreacion { get; set; }
+    public DateTime FechaUltimoCambio { get; set; }
     public DateTime? FechaResolucion { get; set; }
     public bool Cerrada { get; set; }
     public bool Activo { get; set; } = true;
 
-    public void CambiarEstado(int nuevoEstado)
+    // Método de dominio (simple). Puedes extender validaciones de transición aquí.
+    public void CambiarEstado(int nuevoEstadoId)
     {
-        EstadoId = nuevoEstado;
+        if (EstadoId == nuevoEstadoId) return;
+        EstadoId = nuevoEstadoId;
         FechaUltimoCambio = DateTime.UtcNow;
     }
 }

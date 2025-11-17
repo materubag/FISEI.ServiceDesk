@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FISEI.ServiceDesk.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class CoreEntities : Migration
+    public partial class Init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,17 +31,33 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "ComentariosIncidencia",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    IncidenciaId = table.Column<long>(type: "bigint", nullable: false),
-                    UsuarioId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IncidenciaId = table.Column<int>(type: "int", nullable: false),
+                    UsuarioId = table.Column<int>(type: "int", nullable: false),
                     Texto = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     EsInterno = table.Column<bool>(type: "bit", nullable: false),
-                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ComentariosIncidencia", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Escalaciones",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    IncidenciaId = table.Column<int>(type: "int", nullable: false),
+                    Nivel = table.Column<int>(type: "int", nullable: false),
+                    Motivo = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Escalaciones", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -63,13 +79,13 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "Feedbacks",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    IncidenciaId = table.Column<long>(type: "bigint", nullable: false),
-                    UsuarioId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IncidenciaId = table.Column<int>(type: "int", nullable: false),
+                    UsuarioId = table.Column<int>(type: "int", nullable: false),
                     Puntuacion = table.Column<byte>(type: "tinyint", nullable: false),
                     Comentario = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
                 },
                 constraints: table =>
                 {
@@ -80,17 +96,17 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "Incidencias",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    CreadorId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TecnicoAsignadoId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    ServicioId = table.Column<int>(type: "int", nullable: false),
-                    PrioridadId = table.Column<int>(type: "int", nullable: false),
-                    EstadoId = table.Column<int>(type: "int", nullable: false),
                     Titulo = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Descripcion = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FechaCreacion = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    FechaUltimoCambio = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    EstadoId = table.Column<int>(type: "int", nullable: false),
+                    PrioridadId = table.Column<int>(type: "int", nullable: false),
+                    ServicioId = table.Column<int>(type: "int", nullable: false),
+                    CreadorId = table.Column<int>(type: "int", nullable: false),
+                    TecnicoAsignadoId = table.Column<int>(type: "int", nullable: true),
+                    FechaCreacion = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()"),
+                    FechaUltimoCambio = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()"),
                     FechaResolucion = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Cerrada = table.Column<bool>(type: "bit", nullable: false),
                     Activo = table.Column<bool>(type: "bit", nullable: false)
@@ -104,14 +120,14 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "Notificaciones",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    UsuarioDestinoId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UsuarioDestinoId = table.Column<int>(type: "int", nullable: false),
                     Tipo = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Referencia = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Referencia = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Mensaje = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Leida = table.Column<bool>(type: "bit", nullable: false),
-                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
                 },
                 constraints: table =>
                 {
@@ -150,14 +166,14 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "Seguimientos",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
+                    Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    IncidenciaId = table.Column<long>(type: "bigint", nullable: false),
-                    UsuarioId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    IncidenciaId = table.Column<int>(type: "int", nullable: false),
                     EstadoAnteriorId = table.Column<int>(type: "int", nullable: true),
-                    EstadoNuevoId = table.Column<int>(type: "int", nullable: true),
+                    EstadoNuevoId = table.Column<int>(type: "int", nullable: false),
+                    UsuarioId = table.Column<int>(type: "int", nullable: false),
                     Comentario = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    Fecha = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
                 },
                 constraints: table =>
                 {
@@ -180,16 +196,53 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SLA_Definiciones",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    PrioridadId = table.Column<int>(type: "int", nullable: false),
+                    ServicioId = table.Column<int>(type: "int", nullable: true),
+                    HorasRespuesta = table.Column<int>(type: "int", nullable: false),
+                    HorasResolucion = table.Column<int>(type: "int", nullable: false),
+                    Activo = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SLA_Definiciones", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SLA_Incidencias",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    IncidenciaId = table.Column<int>(type: "int", nullable: false),
+                    FechaLimiteRespuesta = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    FechaLimiteResolucion = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CumplidoRespuesta = table.Column<bool>(type: "bit", nullable: false),
+                    CumplidoResolucion = table.Column<bool>(type: "bit", nullable: false),
+                    CreadoUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SLA_Incidencias", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Usuarios",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
                     Nombre = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Correo = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PasswordSalt = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     RolId = table.Column<int>(type: "int", nullable: false),
                     Activo = table.Column<bool>(type: "bit", nullable: false),
-                    FechaRegistro = table.Column<DateTime>(type: "datetime2", nullable: false)
+                    FechaRegistro = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "SYSUTCDATETIME()")
                 },
                 constraints: table =>
                 {
@@ -240,6 +293,17 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "SLA_Definiciones",
+                columns: new[] { "Id", "Activo", "HorasResolucion", "HorasRespuesta", "PrioridadId", "ServicioId" },
+                values: new object[,]
+                {
+                    { 1, true, 72, 24, 1, null },
+                    { 2, true, 48, 12, 2, null },
+                    { 3, true, 24, 4, 3, null },
+                    { 4, true, 8, 2, 4, null }
+                });
+
+            migrationBuilder.InsertData(
                 table: "Servicios",
                 columns: new[] { "Id", "Activo", "CategoriaId", "Nombre" },
                 values: new object[,]
@@ -253,12 +317,12 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             migrationBuilder.InsertData(
                 table: "Usuarios",
-                columns: new[] { "Id", "Activo", "Correo", "FechaRegistro", "Nombre", "PasswordHash", "RolId" },
+                columns: new[] { "Id", "Activo", "Correo", "FechaRegistro", "Nombre", "PasswordHash", "PasswordSalt", "RolId" },
                 values: new object[,]
                 {
-                    { new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"), true, "estudiante@demo.local", new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(7738), "Estudiante Demo", "hash", 1 },
-                    { new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"), true, "tecnico@demo.local", new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(8681), "Tecnico Demo", "hash", 2 },
-                    { new Guid("cccccccc-cccc-cccc-cccc-ccccccccccc3"), true, "admin@demo.local", new DateTime(2025, 11, 11, 3, 38, 0, 19, DateTimeKind.Utc).AddTicks(8684), "Admin Demo", "hash", 3 }
+                    { 1, true, "estudiante@demo.local", new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "Estudiante Demo", "REEMPLAZA_HASH", "REEMPLAZA_SALT", 1 },
+                    { 2, true, "tecnico@demo.local", new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "Tecnico Demo", "REEMPLAZA_HASH", "REEMPLAZA_SALT", 2 },
+                    { 3, true, "admin@demo.local", new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "Admin Demo", "REEMPLAZA_HASH", "REEMPLAZA_SALT", 3 }
                 });
 
             migrationBuilder.CreateIndex(
@@ -284,6 +348,9 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                 name: "ComentariosIncidencia");
 
             migrationBuilder.DropTable(
+                name: "Escalaciones");
+
+            migrationBuilder.DropTable(
                 name: "EstadosIncidencia");
 
             migrationBuilder.DropTable(
@@ -306,6 +373,12 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Servicios");
+
+            migrationBuilder.DropTable(
+                name: "SLA_Definiciones");
+
+            migrationBuilder.DropTable(
+                name: "SLA_Incidencias");
 
             migrationBuilder.DropTable(
                 name: "Usuarios");

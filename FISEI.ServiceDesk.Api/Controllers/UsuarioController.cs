@@ -13,7 +13,8 @@ public class UsuariosController : ControllerBase
     private readonly ServiceDeskDbContext _db;
     public UsuariosController(ServiceDeskDbContext db) => _db = db;
 
-    public record UsuarioDto(Guid Id, string Nombre, string Correo, int RolId, bool Activo, DateTime FechaRegistro);
+    public record UsuarioDto(int Id, string Nombre, string Correo, int RolId, bool Activo, DateTime FechaRegistro);
+
     public class UsuarioCreateDto
     {
         [Required] public string Nombre { get; set; } = default!;
@@ -22,6 +23,7 @@ public class UsuariosController : ControllerBase
         [Required] public int RolId { get; set; }
         public bool Activo { get; set; } = true;
     }
+
     public class UsuarioUpdateDto
     {
         [Required] public string Nombre { get; set; } = default!;
@@ -33,7 +35,10 @@ public class UsuariosController : ControllerBase
 
     // GET /api/usuarios?page=1&pageSize=50&search=mateo
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<UsuarioDto>>> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? search = null)
+    public async Task<ActionResult<IEnumerable<UsuarioDto>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] string? search = null)
     {
         page = page <= 0 ? 1 : page;
         pageSize = pageSize is <= 0 or > 200 ? 50 : pageSize;
@@ -55,8 +60,8 @@ public class UsuariosController : ControllerBase
     }
 
     // GET /api/usuarios/{id}
-    [HttpGet("{id:guid}")]
-    public async Task<ActionResult<UsuarioDto>> GetById([FromRoute] Guid id)
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<UsuarioDto>> GetById([FromRoute] int id)
     {
         var u = await _db.Usuarios.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
         if (u is null) return NotFound();
@@ -67,11 +72,14 @@ public class UsuariosController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UsuarioDto>> Create([FromBody] UsuarioCreateDto dto)
     {
-        if (await _db.Usuarios.AnyAsync(x => x.Correo == dto.Correo)) return Conflict("Correo ya existe.");
+        if (await _db.Usuarios.AnyAsync(x => x.Correo == dto.Correo))
+            return Conflict("Correo ya existe.");
+
         var (hash, salt) = PasswordHasher.HashPassword(dto.Password);
+
         var entity = new Domain.Entities.Usuario
         {
-            Id = Guid.NewGuid(),
+            // Id lo genera la BD (IDENTITY)
             Nombre = dto.Nombre,
             Correo = dto.Correo,
             PasswordHash = hash,
@@ -80,15 +88,17 @@ public class UsuariosController : ControllerBase
             Activo = dto.Activo,
             FechaRegistro = DateTime.UtcNow
         };
+
         _db.Usuarios.Add(entity);
         await _db.SaveChangesAsync();
+
         var result = new UsuarioDto(entity.Id, entity.Nombre, entity.Correo, entity.RolId, entity.Activo, entity.FechaRegistro);
         return CreatedAtAction(nameof(GetById), new { id = entity.Id }, result);
     }
 
     // PUT /api/usuarios/{id}
-    [HttpPut("{id:guid}")]
-    public async Task<ActionResult> Update([FromRoute] Guid id, [FromBody] UsuarioUpdateDto dto)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult> Update([FromRoute] int id, [FromBody] UsuarioUpdateDto dto)
     {
         var u = await _db.Usuarios.FindAsync(id);
         if (u is null) return NotFound();
@@ -114,8 +124,8 @@ public class UsuariosController : ControllerBase
     }
 
     // DELETE /api/usuarios/{id}
-    [HttpDelete("{id:guid}")]
-    public async Task<ActionResult> Delete([FromRoute] Guid id)
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult> Delete([FromRoute] int id)
     {
         var u = await _db.Usuarios.FindAsync(id);
         if (u is null) return NotFound();
