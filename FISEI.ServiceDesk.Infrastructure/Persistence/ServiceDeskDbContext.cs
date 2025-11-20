@@ -21,15 +21,36 @@ public class ServiceDeskDbContext : DbContext
     public DbSet<SLA_Definicion> SLA_Definiciones => Set<SLA_Definicion>();
     public DbSet<SLA_Incidencia> SLA_Incidencias => Set<SLA_Incidencia>();
     public DbSet<Escalacion> Escalaciones => Set<Escalacion>();
+    public DbSet<Laboratorio> Laboratorios => Set<Laboratorio>();
+    public DbSet<ArticuloConocimiento> ArticulosConocimiento => Set<ArticuloConocimiento>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Índices / constraints
+        // Constraints e índices base
         modelBuilder.Entity<Usuario>().HasIndex(u => u.Correo).IsUnique();
         modelBuilder.Entity<Incidencia>().Property(i => i.Titulo).HasMaxLength(200);
         modelBuilder.Entity<EstadoIncidencia>().HasIndex(e => e.Codigo).IsUnique();
 
-        // Defaults SQL para timestamps
+        modelBuilder.Entity<Laboratorio>(b =>
+        {
+            b.Property(x => x.Codigo).HasMaxLength(20);
+            b.Property(x => x.Nombre).HasMaxLength(80);
+            b.Property(x => x.Edificio).HasMaxLength(60);
+            b.Property(x => x.Ubicacion).HasMaxLength(120);
+            b.HasIndex(x => x.Codigo).IsUnique();
+        });
+
+        modelBuilder.Entity<ArticuloConocimiento>(b =>
+        {
+            b.Property(x => x.Titulo).HasMaxLength(200);
+            b.Property(x => x.Etiquetas).HasMaxLength(300);
+            b.Property(x => x.Referencias).HasMaxLength(1000);
+            b.HasIndex(x => new { x.ServicioId, x.LaboratorioId });
+            b.HasIndex(x => new { x.AutorId, x.Activo });
+            b.HasIndex(x => x.IncidenciaOrigenId).HasDatabaseName("IX_KB_IncidenciaOrigen");
+        });
+
+        // Defaults de fecha (UTC)
         modelBuilder.Entity<Usuario>().Property(u => u.FechaRegistro).HasDefaultValueSql("SYSUTCDATETIME()");
         modelBuilder.Entity<Incidencia>().Property(i => i.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
         modelBuilder.Entity<Incidencia>().Property(i => i.FechaUltimoCambio).HasDefaultValueSql("SYSUTCDATETIME()");
@@ -38,21 +59,170 @@ public class ServiceDeskDbContext : DbContext
         modelBuilder.Entity<FeedbackIncidencia>().Property(f => f.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
         modelBuilder.Entity<Notificacion>().Property(n => n.Fecha).HasDefaultValueSql("SYSUTCDATETIME()");
         modelBuilder.Entity<SLA_Incidencia>().Property(s => s.CreadoUtc).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<ArticuloConocimiento>().Property(a => a.FechaCreacion).HasDefaultValueSql("SYSUTCDATETIME()");
+        modelBuilder.Entity<ArticuloConocimiento>().Property(a => a.UltimaActualizacion).HasDefaultValueSql("SYSUTCDATETIME()");
 
-        // Seeds
+        // Relaciones explícitas (FKs visibles en DBeaver)
+        // Servicio -> Categoria
+        modelBuilder.Entity<Servicio>()
+            .HasOne<Categoria>()
+            .WithMany()
+            .HasForeignKey(s => s.CategoriaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Incidencia -> catálogos/usuarios/laboratorio
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<EstadoIncidencia>()
+            .WithMany()
+            .HasForeignKey(i => i.EstadoId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<Prioridad>()
+            .WithMany()
+            .HasForeignKey(i => i.PrioridadId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<Servicio>()
+            .WithMany()
+            .HasForeignKey(i => i.ServicioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(i => i.CreadorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(i => i.TecnicoAsignadoId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Incidencia>()
+            .Property<int?>("LaboratorioId");
+        modelBuilder.Entity<Incidencia>()
+            .HasOne<Laboratorio>()
+            .WithMany()
+            .HasForeignKey("LaboratorioId")
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Seguimiento -> Incidencia/Estados/Usuario
+        modelBuilder.Entity<Seguimiento>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(s => s.IncidenciaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Seguimiento>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(s => s.UsuarioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Seguimiento>()
+            .HasOne<EstadoIncidencia>()
+            .WithMany()
+            .HasForeignKey(s => s.EstadoAnteriorId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<Seguimiento>()
+            .HasOne<EstadoIncidencia>()
+            .WithMany()
+            .HasForeignKey(s => s.EstadoNuevoId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        // Comentario -> Incidencia/Usuario
+        modelBuilder.Entity<ComentarioIncidencia>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(c => c.IncidenciaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ComentarioIncidencia>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(c => c.UsuarioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Feedback -> Incidencia/Usuario
+        modelBuilder.Entity<FeedbackIncidencia>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(f => f.IncidenciaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FeedbackIncidencia>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(f => f.UsuarioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Notificacion -> Usuario destino
+        modelBuilder.Entity<Notificacion>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(n => n.UsuarioDestinoId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // SLA
+        modelBuilder.Entity<SLA_Definicion>()
+            .HasOne<Prioridad>()
+            .WithMany()
+            .HasForeignKey(d => d.PrioridadId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SLA_Definicion>()
+            .HasOne<Servicio>()
+            .WithMany()
+            .HasForeignKey(d => d.ServicioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SLA_Incidencia>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(s => s.IncidenciaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Escalacion -> Incidencia
+        modelBuilder.Entity<Escalacion>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(e => e.IncidenciaId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ArticuloConocimiento -> Servicio/Laboratorio/Autor/IncidenciaOrigen
+        modelBuilder.Entity<ArticuloConocimiento>()
+            .HasOne<Servicio>()
+            .WithMany()
+            .HasForeignKey(a => a.ServicioId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ArticuloConocimiento>()
+            .HasOne<Laboratorio>()
+            .WithMany()
+            .HasForeignKey(a => a.LaboratorioId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ArticuloConocimiento>()
+            .HasOne<Usuario>()
+            .WithMany()
+            .HasForeignKey(a => a.AutorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ArticuloConocimiento>()
+            .HasOne<Incidencia>()
+            .WithMany()
+            .HasForeignKey(a => a.IncidenciaOrigenId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Seeds (roles/estados/prioridades/servicios/labs ejemplo opcional)
         modelBuilder.Entity<Rol>().HasData(
             new Rol { Id = 1, Nombre = "Estudiante" },
             new Rol { Id = 2, Nombre = "Tecnico" },
             new Rol { Id = 3, Nombre = "Administrador" }
-        );
-
-        var seedDate = new DateTime(2025, 01, 01, 0, 0, 0, DateTimeKind.Utc);
-        const string HASH = "REEMPLAZA_HASH"; // genera con tu PasswordHasher
-        const string SALT = "REEMPLAZA_SALT";
-        modelBuilder.Entity<Usuario>().HasData(
-            new Usuario { Id = 1, Nombre = "Estudiante Demo", Correo = "estudiante@demo.local", PasswordHash = HASH, PasswordSalt = SALT, RolId = 1, Activo = true, FechaRegistro = seedDate },
-            new Usuario { Id = 2, Nombre = "Tecnico Demo",    Correo = "tecnico@demo.local",    PasswordHash = HASH, PasswordSalt = SALT, RolId = 2, Activo = true, FechaRegistro = seedDate },
-            new Usuario { Id = 3, Nombre = "Admin Demo",      Correo = "admin@demo.local",      PasswordHash = HASH, PasswordSalt = SALT, RolId = 3, Activo = true, FechaRegistro = seedDate }
         );
 
         modelBuilder.Entity<EstadoIncidencia>().HasData(
@@ -61,34 +231,6 @@ public class ServiceDeskDbContext : DbContext
             new EstadoIncidencia { Id = 3, Codigo = "EN_PROCESO", EsFinal = false, Orden = 3 },
             new EstadoIncidencia { Id = 4, Codigo = "RESUELTO",   EsFinal = false, Orden = 4 },
             new EstadoIncidencia { Id = 5, Codigo = "CERRADO",    EsFinal = true,  Orden = 5 }
-        );
-
-        modelBuilder.Entity<Prioridad>().HasData(
-            new Prioridad { Id = 1, Nombre = "Baja",    Peso = 1, TiempoMaxHoras = 72 },
-            new Prioridad { Id = 2, Nombre = "Media",   Peso = 2, TiempoMaxHoras = 48 },
-            new Prioridad { Id = 3, Nombre = "Alta",    Peso = 3, TiempoMaxHoras = 24 },
-            new Prioridad { Id = 4, Nombre = "Critica", Peso = 4, TiempoMaxHoras = 8 }
-        );
-
-        modelBuilder.Entity<Categoria>().HasData(
-            new Categoria { Id = 1, Nombre = "Redes",      Activo = true },
-            new Categoria { Id = 2, Nombre = "Ofimática",  Activo = true },
-            new Categoria { Id = 3, Nombre = "AulaVirtual",Activo = true }
-        );
-
-        modelBuilder.Entity<Servicio>().HasData(
-            new Servicio { Id = 1, CategoriaId = 1, Nombre = "WiFi",       Activo = true },
-            new Servicio { Id = 2, CategoriaId = 1, Nombre = "Ethernet",   Activo = true },
-            new Servicio { Id = 3, CategoriaId = 2, Nombre = "Correo",     Activo = true },
-            new Servicio { Id = 4, CategoriaId = 2, Nombre = "Impresoras", Activo = true },
-            new Servicio { Id = 5, CategoriaId = 3, Nombre = "AulaVirtual",Activo = true }
-        );
-
-        modelBuilder.Entity<SLA_Definicion>().HasData(
-            new SLA_Definicion { Id = 1, PrioridadId = 1, ServicioId = null, HorasRespuesta = 24, HorasResolucion = 72, Activo = true },
-            new SLA_Definicion { Id = 2, PrioridadId = 2, ServicioId = null, HorasRespuesta = 12, HorasResolucion = 48, Activo = true },
-            new SLA_Definicion { Id = 3, PrioridadId = 3, ServicioId = null, HorasRespuesta = 4,  HorasResolucion = 24, Activo = true },
-            new SLA_Definicion { Id = 4, PrioridadId = 4, ServicioId = null, HorasRespuesta = 2,  HorasResolucion = 8,  Activo = true }
         );
 
         base.OnModelCreating(modelBuilder);

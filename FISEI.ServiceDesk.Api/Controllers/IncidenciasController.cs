@@ -45,6 +45,11 @@ public class IncidenciasController : ControllerBase
         };
 
         _db.Incidencias.Add(entity);
+        if (dto.LaboratorioId.HasValue)
+        {
+            _db.Entry(entity).Property<int?>("LaboratorioId").CurrentValue = dto.LaboratorioId.Value;
+            await _db.SaveChangesAsync();
+        }
         await _db.SaveChangesAsync();
 
         // Seguimiento inicial
