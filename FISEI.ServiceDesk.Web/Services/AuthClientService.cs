@@ -1,38 +1,45 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Threading.Tasks;
 
 namespace FISEI.ServiceDesk.Web.Services;
 
 public class AuthClientService
 {
-    private readonly HttpClient _http;
+    private readonly IHttpClientFactory _httpFactory;
     private string? _token;
 
-    public Guid? CurrentUserId { get; private set; }
-    public string? CurrentRol { get; private set; }
-    public bool IsAuthenticated => _token != null;
+    public bool IsAuthenticated => !string.IsNullOrWhiteSpace(_token);
+    public int? CurrentUserId { get; private set; }
+    public string? CurrentUserRole { get; private set; }
+    public string? CurrentUserName { get; private set; }
 
-    public AuthClientService(HttpClient http)
+    public AuthClientService(IHttpClientFactory httpFactory)
     {
-        _http = http;
+        _httpFactory = httpFactory;
     }
-
-    public record LoginRequest(string correo, string password);
-    public record LoginResponse(Guid userId, string nombre, string rol, string token, DateTime expiraUtc);
 
     public async Task<bool> LoginAsync(string correo, string password)
     {
-        var resp = await _http.PostAsJsonAsync("api/auth/login", new LoginRequest(correo, password));
+        var http = _httpFactory.CreateClient("Auth"); // sin handler
+        var payload = new { Correo = correo, Password = password };
+        var resp = await http.PostAsJsonAsync("/api/auth/login", payload);
         if (!resp.IsSuccessStatusCode) return false;
 
-        var data = await resp.Content.ReadFromJsonAsync<LoginResponse>();
-        if (data is null) return false;
+        var dto = await resp.Content.ReadFromJsonAsync<LoginResponseDto>();
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Token)) return false;
 
-        _token = data.token;
-        CurrentUserId = data.userId;
-        CurrentRol = data.rol;
+        _token = dto.Token;
+        CurrentUserId = dto.UserId;
+        CurrentUserRole = dto.Rol;
+        CurrentUserName = dto.Nombre;
 
-        // Nota: ya no seteamos Authorization en DefaultRequestHeaders aquí;
-        // el AuthHeaderHandler leerá el token en cada request.
+        // Opcional: también setear en el cliente Api actual
+        var api = _httpFactory.CreateClient("Api");
+        api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+
         return true;
     }
 
@@ -40,8 +47,19 @@ public class AuthClientService
     {
         _token = null;
         CurrentUserId = null;
-        CurrentRol = null;
+        CurrentUserRole = null;
+        CurrentUserName = null;
+        // No limpiamos headers de instancias previas; el handler controla el bearer.
     }
 
     public string? GetToken() => _token;
+}
+
+public class LoginResponseDto
+{
+    public int UserId { get; set; }
+    public string Nombre { get; set; } = default!;
+    public string Rol { get; set; } = default!;
+    public string Token { get; set; } = default!;
+    public DateTime ExpiraUtc { get; set; }
 }

@@ -1,31 +1,39 @@
 using FISEI.ServiceDesk.Web.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
+using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configura aquí la URL base de tu API
-var apiBaseUrl = "https://localhost:5031/";
+var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
+    ?? (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"
+        ? "http://api:8080/"
+        : "http://localhost:8070/");
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddHttpContextAccessor();
 
-// Servicio de autenticación (scope por circuito/usuario)
 builder.Services.AddScoped<AuthClientService>();
-
-// Handler que inyecta el token en cada request
 builder.Services.AddScoped<AuthHeaderHandler>();
 
-// HttpClient de la API con base address y el handler de auth
+// Cliente para AUTH (sin handler)
+builder.Services.AddHttpClient("Auth", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+});
+
+// Cliente para API (con bearer automático)
 builder.Services.AddHttpClient("Api", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
-})
-.AddHttpMessageHandler<AuthHeaderHandler>();
+}).AddHttpMessageHandler<AuthHeaderHandler>();
 
-// Al inyectar HttpClient sin nombre, devolvemos el "Api"
-builder.Services.AddScoped(sp =>
-    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
+// HttpClient “por defecto” usará el cliente Api
+builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
-// Servicio de notificaciones SignalR
 builder.Services.AddSingleton<NotificacionesService>();
 
 var app = builder.Build();
@@ -33,6 +41,7 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
+    app.UseHsts();
 }
 
 app.UseStaticFiles();

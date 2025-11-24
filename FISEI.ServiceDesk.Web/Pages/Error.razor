@@ -1,0 +1,18 @@
+@page "/Error"
+@using System.Diagnostics
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h1 class="text-red-500 font-semibold text-xl">Error</h1>
+<p class="text-sm text-slate-300">Ocurrió un problema procesando tu solicitud.</p>
+
+@if (ShowRequestId)
+{
+    <p class="text-xs text-slate-400">Id: <code>@RequestId</code></p>
+}
+
+@code {
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    protected override void OnInitialized() =>
+        RequestId = Activity.Current?.Id ?? HttpContextAccessor.HttpContext?.TraceIdentifier;
+}

@@ -3,37 +3,66 @@
 @inject AuthClientService Auth
 @inject NavigationManager Nav
 
-<h3>Login</h3>
-
-@if (error != null)
-{
-    <div class="alert alert-danger">@error</div>
-}
-
-<div class="mb-3">
-    <label>Correo</label>
-    <input class="form-control" @bind="correo" />
-</div>
-<div class="mb-3">
-    <label>Password</label>
-    <input type="password" class="form-control" @bind="password" />
-</div>
-<button class="btn btn-primary" @onclick="DoLogin">Ingresar</button>
-
 @code {
     private string correo = "estudiante@demo.local";
     private string password = "demo123";
     private string? error;
+    private bool loading;
+
+    protected override void OnInitialized()
+    {
+        if (Auth.IsAuthenticated)
+            Nav.NavigateTo("/", true);
+    }
 
     private async Task DoLogin()
     {
+        error = null;
+        loading = true;
         var ok = await Auth.LoginAsync(correo, password);
+        loading = false;
         if (!ok)
         {
-            error = "Login inválido";
+            error = "Credenciales inválidas.";
             return;
         }
-        error = null;
-        Nav.NavigateTo("/");
+        Nav.NavigateTo("/", true);
     }
 }
+
+<div class="layout-center">
+  <div class="w-full max-w-md space-y-6 fade-in">
+    <div class="text-center space-y-1">
+      <div class="logo-mark">ServiceDesk</div>
+      <p class="muted">Acceso estudiantes / técnicos</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(error))
+    {
+      <div class="alert-error">@error</div>
+    }
+
+    <div class="card space-y-5">
+      <form @onsubmit="DoLogin" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Correo institucional</label>
+          <input type="email" class="input-text" @bind="correo" required />
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Contraseña</label>
+          <input type="password" class="input-text" @bind="password" required />
+        </div>
+        <div class="flex items-center justify-between">
+          <a class="link-inline text-sm" href="/recuperar">¿Olvidaste tu contraseña?</a>
+          <button type="submit" class="btn btn-primary" disabled="@loading">
+            @(loading ? "Ingresando..." : "Ingresar")
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <p class="muted text-center text-xs">
+      © @DateTime.UtcNow.Year FISEI – Mesa de Ayuda
+    </p>
+  </div>
+</div>
