@@ -19,15 +19,19 @@
     {
         error = null;
         loading = true;
+
         var ok = await Auth.LoginAsync(correo, password);
         loading = false;
+
         if (!ok)
         {
             error = "Credenciales inválidas.";
             return;
         }
-        Nav.NavigateTo("/", true);
+
+        Nav.NavigateTo("/home", true);
     }
+
 }
 
 <div class="layout-center">

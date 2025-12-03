@@ -8,7 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FISEI ServiceDesk</title>
     <base href="~/" />
-    <link rel="stylesheet" href="app.bundle.css" />
+    <link rel="stylesheet" href="app.bundle.css" asp-append-version="true" />
+    <!-- Fallback to unbundled CSS if bundle not generated -->
+    <link rel="stylesheet" href="app.css" asp-append-version="true" />
 </head>
 <body class="bg-[#0b1020] text-slate-100">
     <component type="typeof(FISEI.ServiceDesk.Web.Components.App)" render-mode="ServerPrerendered" />

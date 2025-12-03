@@ -1,47 +1,134 @@
 @page "/"
-@using FISEI.ServiceDesk.Web.Services
-@inject AuthClientService Auth
-@inject NotificacionesService Notif
+@page "/home"
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject NavigationManager Nav
 @inject HttpClient Http
 
-<div class="p-6 space-y-4">
-    @if (!Auth.IsAuthenticated)
-    {
-        <div class="card space-y-3 max-w-md">
-            <h1 class="text-2xl font-semibold">Bienvenido</h1>
-            <p class="muted">Inicia sesión para acceder al ServiceDesk.</p>
-            <a href="/login" class="btn btn-primary w-full">Ir al Login</a>
-        </div>
-    }
-    else
-    {
-        <h1 class="text-xl font-semibold">Panel</h1>
-        <p>Usuario: @Auth.CurrentUserId (@Auth.CurrentUserRole)</p>
-        <button class="btn btn-secondary" @onclick="Logout">Logout</button>
-        <div class="mt-4">
-            <NotificacionesBadge />
-        </div>
-        @if (!Notif.Conectado)
-        {
-            <p class="text-sm text-slate-400">Conectando a notificaciones...</p>
-        }
-    }
-</div>
-
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private bool loading = true;
+    private string? error;
+    private List<TicketRow> tickets = new();
+    private List<Stat> stats = new();
+
+  protected override void OnInitialized()
+  {
+    // Redirect early to avoid NavigationException surfacing during async init/render
+    if (!Auth.IsAuthenticated)
     {
-        if (firstRender && Auth.IsAuthenticated && !Notif.Conectado)
+      Nav.NavigateTo("/login", true);
+      return;
+    }
+  }
+
+    protected override async Task OnInitializedAsync()
+    {
+    if (!Auth.IsAuthenticated)
+    {
+      // Already handled in OnInitialized; ensure no further work
+      return;
+    }
+        try
         {
-            // Ajustar URL del hub cuando esté detrás de reverse proxy / variable env
-            await Notif.ConectarAsync("/hubs/notificaciones", () => Task.FromResult(Auth.GetToken()));
-            StateHasChanged();
+            // Demo: puedes reemplazar por API real
+            stats = new() {
+                new("Tickets Activos","fa-ticket-alt","stat-primary","128"),
+                new("En Progreso","fa-clock","stat-warning","32"),
+                new("Resueltos (mes)","fa-check-circle","stat-success","64"),
+                new("Críticos","fa-exclamation-triangle","stat-danger","5"),
+            };
+            tickets = new() {
+                new(101,"2025-12-01","Lab Redes","PC estación 12 no enciende","Alta","Abierto"),
+                new(102,"2025-12-01","Lab Software","Error de login en PC 8","Media","En Progreso"),
+            };
         }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
     }
 
+    private record Stat(string Title, string Icon, string Class, string Number);
+    private record TicketRow(int Id, string Fecha, string Lab, string Titulo, string Prioridad, string Estado);
     private void Logout()
     {
         Auth.Logout();
-        StateHasChanged();
+        Nav.NavigateTo("/login", true);
     }
 }
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container">
+      <div class="uta-logo"><i class="fas fa-university"></i></div>
+      <div class="university-info">
+        <h1>Universidad Técnica de Ambato</h1>
+        <p>Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
+      </div>
+    </div>
+    <div class="user-info">
+      <div class="user-avatar-placeholder">@((Auth.CurrentUserName ?? "U").Substring(0,1))</div>
+      <div class="user-meta">
+        <div>@(Auth.CurrentUserName ?? "Usuario")</div>
+        <div class="muted">@Auth.CurrentUserRole</div>
+      </div>
+     <button class="btn btn-ghost" @onclick="Logout">
+  
+
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<nav class="main-navigation">
+  <div class="nav-container">
+    <ul class="nav-menu">
+      <li><a class="active" href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
+      <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
+      <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main class="main-content">
+  <section class="dashboard-overview">
+    <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Panel de Control - Laboratorios FIESI</h2>
+
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else
+    {
+      <div class="stats-grid">
+        @foreach (var s in stats)
+        {
+          <div class="stat-card @s.Class">
+            <div class="stat-icon"><i class="fas @s.Icon"></i></div>
+            <div class="stat-content">
+              <h3>@s.Title</h3>
+              <span class="stat-number">@s.Number</span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <section class="content-card">
+        <div class="card-header">
+          <h2><i class="fas fa-list-alt"></i> Tickets Registrados</h2>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr><th>ID</th><th>Fecha</th><th>Laboratorio</th><th>Título</th><th>Prioridad</th><th>Estado</th></tr>
+            </thead>
+            <tbody>
+              @foreach (var t in tickets)
+              {
+                <tr>
+                  <td>@t.Id</td><td>@t.Fecha</td><td>@t.Lab</td><td>@t.Titulo</td><td>@t.Prioridad</td><td>@t.Estado</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  </section>
+</main>
