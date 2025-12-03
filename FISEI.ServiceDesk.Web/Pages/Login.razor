@@ -1,7 +1,8 @@
 @page "/login"
 @using Microsoft.AspNetCore.Components.Forms
 @using System.ComponentModel.DataAnnotations
-@inject NavigationManager NavigationManager
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject NavigationManager Nav
 
 <div class="min-h-screen bg-gray-100 flex flex-col">
   <header class="bg-gradient-to-r from-red-800 to-red-900 text-white shadow-md">
@@ -26,6 +27,10 @@
         <p class="text-sm text-gray-500 mt-1">Sistema de Gestión de Tickets - Laboratorios FISEI</p>
       </div>
       <div class="p-6">
+        @if (!string.IsNullOrEmpty(error))
+        {
+          <div class="mb-4 rounded-md border border-red-200 bg-red-50 text-red-800 px-3 py-2 text-sm">@error</div>
+        }
         <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
           <DataAnnotationsValidator />
           <ValidationSummary />
@@ -45,7 +50,9 @@
               </label>
               <a href="/recuperar" class="text-sm text-red-700 hover:text-red-800">¿Olvidaste tu contraseña?</a>
             </div>
-            <button type="submit" class="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-2.5 rounded-md transition-colors">Ingresar</button>
+            <button type="submit" class="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-2.5 rounded-md transition-colors" disabled="@loading">
+              @(loading ? "Ingresando..." : "Ingresar")
+            </button>
           </div>
         </EditForm>
       </div>
@@ -61,11 +68,21 @@
 
 @code {
   private LoginModel loginModel = new();
+  private bool loading;
+  private string? error;
 
-  private Task HandleLogin()
+  private async Task HandleLogin()
   {
-    NavigationManager.NavigateTo("/");
-    return Task.CompletedTask;
+    error = null;
+    loading = true;
+    var ok = await Auth.LoginAsync(loginModel.Email, loginModel.Password);
+    loading = false;
+    if (!ok)
+    {
+        error = "Credenciales inválidas.";
+        return;
+    }
+    Nav.NavigateTo("/", false);
   }
 
   public class LoginModel
