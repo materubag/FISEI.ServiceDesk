@@ -15,7 +15,12 @@ public class KnowledgeBaseService
 
     // Detalle
     public async Task<KbArticuloDto?> ObtenerAsync(int id)
-        => await _http.GetFromJsonAsync<KbArticuloDto>($"/api/kb/{id}");
+    {
+        var resp = await _http.GetAsync($"/api/kb/{id}");
+        if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadFromJsonAsync<KbArticuloDto>();
+    }
 
     public async Task VotarAsync(int id, int score)
     {

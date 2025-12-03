@@ -11,7 +11,12 @@ public class UsuariosLookupService
 
     // Endpoint sugerido para resolver nombre por Id
     public async Task<UsuarioMiniDto?> ObtenerAsync(int id)
-        => await _http.GetFromJsonAsync<UsuarioMiniDto>($"/api/usuarios/{id}/mini");
+    {
+        var resp = await _http.GetAsync($"/api/usuarios/{id}/mini");
+        if (resp.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        resp.EnsureSuccessStatusCode();
+        return await resp.Content.ReadFromJsonAsync<UsuarioMiniDto>();
+    }
 }
 
 public class UsuarioMiniDto

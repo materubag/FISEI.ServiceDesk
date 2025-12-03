@@ -1,8 +1,11 @@
 @page "/incidencia/{id:int}"
 @using FISEI.ServiceDesk.Web.Services
 @inject NavigationManager Nav
-@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
-@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
+@inject AuthClientService Auth
+@inject IncidenciasService IncSvc
+@inject ServiciosService ServSvc
+@inject PrioridadesService PriSvc
+@inject EstadosService EstSvc
 
 @code {
     [Parameter] public int id { get; set; }
@@ -12,16 +15,48 @@
     private string nuevoComentario = "";
     private bool esInterno = false;
 
+    private string? servicioNombre;
+    private string? prioridadNombre;
+    private string? estadoTexto;
+
     protected override async Task OnInitializedAsync()
     {
-        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
         await Cargar();
     }
 
     private async Task Cargar()
     {
         loading = true; error = null;
-        try { inc = await IncSvc.ObtenerDetalleAsync(id); }
+        try
+        {
+            inc = await IncSvc.ObtenerDetalleAsync(id);
+            if (inc is not null)
+            {
+                // Servicio
+                servicioNombre = !string.IsNullOrWhiteSpace(inc.ServicioNombre)
+                    ? inc.ServicioNombre
+                    : (await ServSvc.ObtenerAsync(inc.ServicioId))?.Nombre ?? $"#{inc.ServicioId}";
+
+                // Prioridad
+                prioridadNombre = !string.IsNullOrWhiteSpace(inc.PrioridadNombre)
+                    ? inc.PrioridadNombre
+                    : (await PriSvc.ObtenerAsync(inc.PrioridadId))?.Nombre ?? $"#{inc.PrioridadId}";
+
+                // Estado con fallback a Codigo
+                if (!string.IsNullOrWhiteSpace(inc.EstadoNombre))
+                {
+                    estadoTexto = inc.EstadoNombre;
+                }
+                else
+                {
+                    var estado = await EstSvc.ObtenerAsync(inc.EstadoId);
+                    estadoTexto = !string.IsNullOrWhiteSpace(estado?.Nombre)
+                        ? estado!.Nombre!
+                        : (!string.IsNullOrWhiteSpace(estado?.Codigo) ? estado!.Codigo! : $"#{inc.EstadoId}");
+                }
+            }
+        }
         catch (Exception ex) { error = ex.Message; }
         finally { loading = false; }
     }
@@ -50,7 +85,11 @@
     <section class="content-card">
       <h2>@inc.Titulo</h2>
       <p class="muted">@inc.Descripcion</p>
-      <p><b>Servicio:</b> @inc.ServicioNombre — <b>Prioridad:</b> @inc.PrioridadNombre — <b>Estado:</b> @inc.EstadoNombre</p>
+      <p>
+        <b>Servicio:</b> @servicioNombre —
+        <b>Prioridad:</b> @prioridadNombre —
+        <b>Estado:</b> @estadoTexto
+      </p>
     </section>
 
     <section class="content-card">
