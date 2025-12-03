@@ -1,72 +1,83 @@
 @page "/login"
-@using FISEI.ServiceDesk.Web.Services
-@inject AuthClientService Auth
-@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager NavigationManager
+
+<div class="min-h-screen bg-gray-100 flex flex-col">
+  <header class="bg-gradient-to-r from-red-800 to-red-900 text-white shadow-md">
+    <div class="max-w-6xl mx-auto px-4 py-6 flex items-center gap-6">
+      <div class="w-14 h-14 rounded-full bg-white text-red-800 flex items-center justify-center shadow-lg">
+        <span class="text-2xl font-bold">UTA</span>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold">Universidad Técnica de Ambato</h1>
+        <p class="text-sm opacity-90">Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200">
+      <div class="px-6 pt-6">
+        <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
+          <span class="inline-block w-2 h-2 rounded-full bg-red-700"></span>
+          Iniciar sesión
+        </h2>
+        <p class="text-sm text-gray-500 mt-1">Sistema de Gestión de Tickets - Laboratorios FISEI</p>
+      </div>
+      <div class="p-6">
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+          <DataAnnotationsValidator />
+          <ValidationSummary />
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Correo institucional</label>
+              <InputText @bind-Value="loginModel.Email" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+              <InputText @bind-Value="loginModel.Password" type="password" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+            </div>
+            <div class="flex items-center justify-between">
+              <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" class="rounded border-gray-300 text-red-700 focus:ring-red-700" @bind="loginModel.Remember" />
+                Recordarme
+              </label>
+              <a href="/recuperar" class="text-sm text-red-700 hover:text-red-800">¿Olvidaste tu contraseña?</a>
+            </div>
+            <button type="submit" class="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-2.5 rounded-md transition-colors">Ingresar</button>
+          </div>
+        </EditForm>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-gray-200">
+    <div class="max-w-6xl mx-auto px-4 py-6 text-sm text-gray-600">
+      &copy; @DateTime.UtcNow.Year Universidad Técnica de Ambato - FIESI
+    </div>
+  </footer>
+</div>
 
 @code {
-    private string correo = "estudiante@demo.local";
-    private string password = "demo123";
-    private string? error;
-    private bool loading;
+  private LoginModel loginModel = new();
 
-    protected override void OnInitialized()
-    {
-        if (Auth.IsAuthenticated)
-            Nav.NavigateTo("/", true);
-    }
+  private Task HandleLogin()
+  {
+    NavigationManager.NavigateTo("/");
+    return Task.CompletedTask;
+  }
 
-    private async Task DoLogin()
-    {
-        error = null;
-        loading = true;
+  public class LoginModel
+  {
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
 
-        var ok = await Auth.LoginAsync(correo, password);
-        loading = false;
+    [Required]
+    public string Password { get; set; } = string.Empty;
 
-        if (!ok)
-        {
-            error = "Credenciales inválidas.";
-            return;
-        }
-
-        Nav.NavigateTo("/home", true);
-    }
-
+    public bool Remember { get; set; }
+  }
 }
 
-<div class="layout-center">
-  <div class="w-full max-w-md space-y-6 fade-in">
-    <div class="text-center space-y-1">
-      <div class="logo-mark">ServiceDesk</div>
-      <p class="muted">Acceso estudiantes / técnicos</p>
-    </div>
-
-    @if (!string.IsNullOrEmpty(error))
-    {
-      <div class="alert-error">@error</div>
-    }
-
-    <div class="card space-y-5">
-      <form @onsubmit="DoLogin" class="space-y-4">
-        <div>
-          <label class="block text-sm font-medium mb-1">Correo institucional</label>
-          <input type="email" class="input-text" @bind="correo" required />
-        </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Contraseña</label>
-          <input type="password" class="input-text" @bind="password" required />
-        </div>
-        <div class="flex items-center justify-between">
-          <a class="link-inline text-sm" href="/recuperar">¿Olvidaste tu contraseña?</a>
-          <button type="submit" class="btn btn-primary" disabled="@loading">
-            @(loading ? "Ingresando..." : "Ingresar")
-          </button>
-        </div>
-      </form>
-    </div>
-
-    <p class="muted text-center text-xs">
-      © @DateTime.UtcNow.Year FISEI – Mesa de Ayuda
-    </p>
-  </div>
-</div>
