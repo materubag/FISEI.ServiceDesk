@@ -25,6 +25,45 @@
       }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+      if (firstRender && redirectToLogin)
+      {
+        try
+        {
+          Nav.NavigateTo("/login", false);
+        }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+          // Ignorar la excepción de navegación; la redirección es intencional.
+        }
+      }
+      await Task.CompletedTask;
+    }
+
+    private async Task CargarCatalogosYResolverNombres()
+    {
+      try
+      {
+        var t1 = ServSvc.ListarAsync();
+        var t2 = PriSvc.ListarAsync();
+        var t3 = EstSvc.ListarAsync();
+        await Task.WhenAll(t1, t2, t3);
+        mapServicios = t1.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapPrioridades = t2.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapEstados = t3.Result.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+
+        foreach (var i in vm.Recientes)
+        {
+          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
+          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
+          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
+        }
+      }
+      catch { /* silencioso: mostramos IDs si falta */ }
     }
 
     private async Task CargarCatalogosYResolverNombres()
@@ -52,25 +91,18 @@
     private void LogoutAndNavigate()
     {
         Auth.Logout();
+      try
+      {
         Nav.NavigateTo("/login", true);
+      }
+      catch (Microsoft.AspNetCore.Components.NavigationException)
+      {
+        // Ignore navigation exception; navigation will proceed.
+      }
     }
 }
 
-<header class="institutional-header">
-  <div class="header-container">
-    <div class="logo-container">
-      <div class="uta-logo"><i class="fas fa-university"></i></div>
-      <div class="university-info">
-        <h1>Universidad Técnica de Ambato</h1>
-        <p>Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
-      </div>
-    </div>
-      <button class="btn btn-ghost" @onclick="LogoutAndNavigate">
-        <i class="fas fa-sign-out-alt"></i>
-      </button>
-    </div>
- 
-</header>
+
 
 <nav class="main-navigation">
   <div class="nav-container">
