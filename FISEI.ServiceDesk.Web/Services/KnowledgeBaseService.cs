@@ -1,0 +1,125 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+namespace FISEI.ServiceDesk.Web.Services;
+
+public class KnowledgeBaseService
+{
+    private readonly HttpClient _http;
+    public KnowledgeBaseService(HttpClient http) => _http = http;
+
+    // Detalle
+    public async Task<KbArticuloDto?> ObtenerAsync(int id)
+        => await _http.GetFromJsonAsync<KbArticuloDto>($"/api/kb/{id}");
+
+    public async Task VotarAsync(int id, int score)
+    {
+        var resp = await _http.PostAsJsonAsync($"/api/kb/{id}/votar", new { Puntuacion = score });
+        resp.EnsureSuccessStatusCode();
+    }
+
+    public async Task EnviarFeedbackAsync(int id, KbFeedbackCrearDto dto)
+    {
+        var resp = await _http.PostAsJsonAsync($"/api/kb/{id}/feedback", dto);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    // Lista/búsqueda (robusto a objeto paginado o array simple)
+    public async Task<PagedResult<KbArticuloResumenDto>> BuscarAsync(
+        string? query, int? servicioId, int? laboratorioId, int? autorId, int page, int pageSize)
+    {
+        var url = $"/api/kb?query={Uri.EscapeDataString(query ?? "")}&page={page}&pageSize={pageSize}";
+        if (servicioId.HasValue) url += $"&servicioId={servicioId.Value}";
+        if (laboratorioId.HasValue) url += $"&laboratorioId={laboratorioId.Value}";
+        if (autorId.HasValue) url += $"&autorId={autorId.Value}";
+
+        var resp = await _http.GetAsync(url);
+        if (resp.StatusCode == HttpStatusCode.NoContent)
+            return new PagedResult<KbArticuloResumenDto> { Items = new(), Total = 0, Page = page, PageSize = pageSize };
+
+        resp.EnsureSuccessStatusCode();
+        var json = await resp.Content.ReadAsStringAsync();
+
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        try
+        {
+            var paged = JsonSerializer.Deserialize<PagedResult<KbArticuloResumenDto>>(json, opts);
+            if (paged?.Items != null) return paged;
+        }
+        catch { /* intentar como array */ }
+
+        var arr = JsonSerializer.Deserialize<List<KbArticuloResumenDto>>(json, opts) ?? new();
+        return new PagedResult<KbArticuloResumenDto> { Items = arr, Total = arr.Count, Page = page, PageSize = pageSize };
+    }
+}
+
+// DTOs lista/paginación
+public class KbArticuloResumenDto
+{
+    public int Id { get; set; }
+    public string Titulo { get; set; } = "";
+    public string? Extracto { get; set; }
+    public string? Etiquetas { get; set; }
+    public string? Referencias { get; set; }
+
+    public int? ServicioId { get; set; }
+    public int? LaboratorioId { get; set; }
+    public int AutorId { get; set; }
+    public int? IncidenciaOrigenId { get; set; }
+
+    public DateTime FechaCreacion { get; set; }
+    public DateTime UltimaActualizacion { get; set; }
+    public bool Activo { get; set; }
+
+    // Nombres opcionales si la API los trae
+    public string? ServicioNombre { get; set; }
+    public string? LaboratorioNombre { get; set; }
+    public string? AutorNombre { get; set; }
+
+    // Métricas (si aplica)
+    public int Votos { get; set; }
+    public double PromedioVotos { get; set; }
+}
+
+public class PagedResult<T>
+{
+    public List<T> Items { get; set; } = new();
+    public int? Total { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+}
+
+// DTO detalle
+public class KbArticuloDto
+{
+    public int Id { get; set; }
+    public string Titulo { get; set; } = "";
+    public string Contenido { get; set; } = "";        // texto/markdown
+    public string? ContenidoHtml { get; set; }         // si la API ya lo renderiza
+    public string? Referencias { get; set; }
+    public string? Etiquetas { get; set; }
+    public int? ServicioId { get; set; }
+    public int? LaboratorioId { get; set; }
+    public int AutorId { get; set; }
+    public int? IncidenciaOrigenId { get; set; }
+    public DateTime FechaCreacion { get; set; }
+    public DateTime UltimaActualizacion { get; set; }
+    public bool Activo { get; set; }
+
+    public string? ServicioNombre { get; set; }
+    public string? LaboratorioNombre { get; set; }
+    public string? AutorNombre { get; set; }
+
+    public int Votos { get; set; }
+    public double PromedioVotos { get; set; }
+}
+
+public class KbFeedbackCrearDto
+{
+    public string Texto { get; set; } = "";
+}

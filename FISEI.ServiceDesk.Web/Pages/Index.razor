@@ -3,18 +3,50 @@
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 @inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.PrioridadesService PriSvc
+@inject FISEI.ServiceDesk.Web.Services.EstadosService EstSvc
 
 @code {
     private bool loading = true;
     private string? error;
     private DashboardVmDto vm = new();
+    private Dictionary<int,string> mapServicios = new();
+    private Dictionary<int,string> mapPrioridades = new();
+    private Dictionary<int,string> mapEstados = new();
 
     protected override async Task OnInitializedAsync()
     {
-      if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
-      try { vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value); }
+      
+      try {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+        vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value);
+        await CargarCatalogosYResolverNombres();
+      }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
+    }
+
+    private async Task CargarCatalogosYResolverNombres()
+    {
+      try
+      {
+        var t1 = ServSvc.ListarAsync();
+        var t2 = PriSvc.ListarAsync();
+        var t3 = EstSvc.ListarAsync();
+        await Task.WhenAll(t1, t2, t3);
+        mapServicios = t1.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapPrioridades = t2.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapEstados = t3.Result.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+
+        foreach (var i in vm.Recientes)
+        {
+          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
+          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
+          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
+        }
+      }
+      catch { /* silencioso: mostramos IDs si falta */ }
     }
 
     private void LogoutAndNavigate()

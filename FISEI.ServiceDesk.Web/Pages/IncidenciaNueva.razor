@@ -1,29 +1,34 @@
 @page "/incidencia/nueva"
 @using FISEI.ServiceDesk.Web.Services
 @inject NavigationManager Nav
-@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
-@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
-@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject AuthClientService Auth
+@inject IncidenciasService IncSvc
+@inject ServiciosService ServSvc
+@inject LaboratoriosService LabSvc
 
 @code {
     private bool saving;
     private string? error;
     private NuevaIncidenciaDto model = new();
     private List<ServicioDto> servicios = new();
+    private List<LaboratorioDto> laboratorios = new();
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
-      servicios = await ServSvc.ListarAsync();
-      model.CreadorId = Auth.CurrentUserId!.Value;
-      if (servicios.Count > 0)
-      {
-        model.ServicioId = servicios[0].Id;
-      }
-      if (model.PrioridadId == 0)
-      {
-        model.PrioridadId = 2; // Media por defecto
-      }
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+
+        var tServ = ServSvc.ListarAsync();
+        var tLabs = LabSvc.ListarAsync();
+        await Task.WhenAll(tServ, tLabs);
+        servicios = tServ.Result;
+        laboratorios = tLabs.Result;
+
+        model.CreadorId = Auth.CurrentUserId!.Value;
+        if (servicios.Count > 0)
+            model.ServicioId = servicios[0].Id;
+        if (model.PrioridadId == 0)
+            model.PrioridadId = 2; // Media por defecto
+        // Laboratorio es opcional: deja null por defecto
     }
 
     private async Task Guardar()
@@ -48,9 +53,9 @@
     @if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
     <div class="form-stack">
       <label class="form-label">Servicio
-        <select class="form-control" @bind="model.ServicioId">
+        <InputSelect @bind-Value="model.ServicioId" class="form-control">
           @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
-        </select>
+        </InputSelect>
       </label>
       <label class="form-label">Título
         <input class="form-control" @bind="model.Titulo" />
@@ -59,12 +64,21 @@
         <textarea class="form-control" rows="5" @bind="model.Descripcion"></textarea>
       </label>
       <label class="form-label">Prioridad
-        <select class="form-control" @bind="model.PrioridadId">
-          <option value="1">Baja</option><option value="2">Media</option><option value="3">Alta</option><option value="4">Crítica</option>
-        </select>
+        <InputSelect @bind-Value="model.PrioridadId" class="form-control">
+          <option value="1">Baja</option>
+          <option value="2">Media</option>
+          <option value="3">Alta</option>
+          <option value="4">Crítica</option>
+        </InputSelect>
       </label>
       <label class="form-label">Laboratorio (opcional)
-        <input class="form-control" type="number" @bind="model.LaboratorioId" />
+        <InputSelect @bind-Value="model.LaboratorioId" class="form-control">
+          <option value="">Selecciona laboratorio (opcional)</option>
+          @foreach (var l in laboratorios)
+          {
+            <option value="@l.Id">@l.Nombre</option>
+          }
+        </InputSelect>
       </label>
       <div class="form-actions">
         <button class="btn btn-primary" disabled="@saving" @onclick="Guardar"><i class="fas fa-paper-plane"></i> Registrar</button>

@@ -35,6 +35,16 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
 builder.Services.AddSingleton<NotificacionesService>();
+builder.Services.AddScoped<UsuariosService>();
+builder.Services.AddScoped<UsuariosLookupService>();
+builder.Services.AddScoped<KnowledgeBaseService>();
+builder.Services.AddScoped<ReportesService>();
+builder.Services.AddScoped<NotificacionesApiService>();
+builder.Services.AddScoped<ServiciosService>();
+builder.Services.AddScoped<EstadosService>();
+builder.Services.AddScoped<PrioridadesService>();
+builder.Services.AddScoped<CategoriasService>();
+builder.Services.AddScoped<LaboratoriosService>();
 builder.Services.AddScoped<IncidenciasService>();
 builder.Services.AddScoped<ServiciosService>();
 

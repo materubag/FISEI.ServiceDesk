@@ -1,0 +1,79 @@
+@page "/notificaciones"
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.NotificacionesApiService NotiSvc
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private List<NotificacionDto> items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        loading = true; error = null;
+        try { items = await NotiSvc.ListarAsync(Auth.CurrentUserId!.Value); }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+
+    private async Task MarcarLeida(int id)
+    {
+        try { await NotiSvc.MarcarLeidaAsync(id); await Cargar(); }
+        catch (Exception ex) { error = ex.Message; }
+    }
+
+    private async Task MarcarTodas()
+    {
+        try { await NotiSvc.MarcarTodasLeidasAsync(Auth.CurrentUserId!.Value); await Cargar(); }
+        catch (Exception ex) { error = ex.Message; }
+    }
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container">
+      <div class="uta-logo"><i class="fas fa-bell"></i></div>
+      <div class="university-info"><h1>Notificaciones</h1><p>Centro de notificaciones</p></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn" @onclick="MarcarTodas"><i class="fas fa-check-double"></i> Marcar todas como leídas</button>
+      <NotificacionesBadge />
+    </div>
+  </div>
+</header>
+
+<main class="main-content">
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (items.Count == 0) { <p class="muted">No hay notificaciones</p> }
+    else
+    {
+      <ul>
+        @foreach (var n in items.OrderByDescending(x => x.Fecha))
+        {
+          <li style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;gap:8px">
+              <div>
+                <b>@n.Titulo</b> <span class="muted">(@n.Fecha.ToLocalTime())</span>
+                <div>@n.Mensaje</div>
+              </div>
+              <div>
+                @if (!n.Leida)
+                {
+                  <button class="btn btn-primary" @onclick='() => MarcarLeida(n.Id)'><i class="fas fa-check"></i> Leída</button>
+                }
+              </div>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+</main>

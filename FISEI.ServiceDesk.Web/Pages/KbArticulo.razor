@@ -1,0 +1,147 @@
+@page "/kb/{id:int}"
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.KnowledgeBaseService Kb
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
+@inject FISEI.ServiceDesk.Web.Services.UsuariosLookupService Users
+
+@code {
+    [Parameter] public int id { get; set; }
+    private bool loading = true;
+    private string? error;
+    private KbArticuloDto? art;
+    private int voto = 0;
+    private string feedback = "";
+    private string? okMsg;
+
+    private string? servicioNombre;
+    private string? laboratorioNombre;
+    private string? autorNombre;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        loading = true; error = okMsg = null;
+        try
+        {
+            art = await Kb.ObtenerAsync(id);
+            if (art != null)
+            {
+                servicioNombre = art.ServicioNombre ?? (art.ServicioId.HasValue ? (await ServSvc.ObtenerAsync(art.ServicioId.Value))?.Nombre : null);
+                laboratorioNombre = art.LaboratorioNombre ?? (art.LaboratorioId.HasValue ? (await LabSvc.ObtenerAsync(art.LaboratorioId.Value))?.Nombre : null);
+                autorNombre = art.AutorNombre ?? (await Users.ObtenerAsync(art.AutorId))?.Nombre;
+            }
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+
+    private async Task EnviarVoto(int score)
+    {
+        try { await Kb.VotarAsync(id, score); voto = score; okMsg = "¡Gracias por tu voto!"; }
+        catch (Exception ex) { error = ex.Message; }
+    }
+
+    private async Task EnviarFeedback()
+    {
+        try { await Kb.EnviarFeedbackAsync(id, new KbFeedbackCrearDto { Texto = feedback }); feedback = ""; okMsg = "Feedback enviado."; }
+        catch (Exception ex) { error = ex.Message; }
+    }
+
+    private static IEnumerable<string> SplitTags(string? tags)
+        => string.IsNullOrWhiteSpace(tags) ? Array.Empty<string>() : tags.Split(new[]{';',','}, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static IEnumerable<string> SplitRefs(string? refs)
+        => string.IsNullOrWhiteSpace(refs) ? Array.Empty<string>() : refs.Split(new[]{'\n',';'}, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-book-open"></i></div><div class="university-info"><h1>Artículo KB</h1></div></div>
+  </div>
+</header>
+
+<main class="main-content">
+  @if (loading) { <p class="muted">Cargando...</p> }
+  else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+  else if (art is null) { <p class="muted">No encontrado</p> }
+  else
+  {
+    <section class="content-card">
+      <h2>@art.Titulo</h2>
+      <p class="muted">
+        Servicio: @(servicioNombre ?? (art.ServicioId is null ? "-" : $"#{art.ServicioId}")) •
+        Laboratorio: @(laboratorioNombre ?? (art.LaboratorioId is null ? "-" : $"#{art.LaboratorioId}")) •
+        Autor: @(autorNombre ?? $"#{art.AutorId}")
+      </p>
+
+      <div style="margin-top:10px">
+        @if (!string.IsNullOrWhiteSpace(art.ContenidoHtml))
+        {
+          @((MarkupString)art.ContenidoHtml)
+        }
+        else
+        {
+          <pre style="white-space:pre-wrap;margin:0">@art.Contenido</pre>
+        }
+      </div>
+
+      @if (!string.IsNullOrWhiteSpace(art.Etiquetas))
+      {
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          @foreach (var tag in SplitTags(art.Etiquetas))
+          {
+            <span style="background:#eee;border-radius:999px;padding:2px 8px;font-size:.85rem">#@tag</span>
+          }
+        </div>
+      }
+
+      @if (!string.IsNullOrWhiteSpace(art.Referencias))
+      {
+        <div class="muted" style="margin-top:8px">
+          Referencias:
+          @foreach (var r in SplitRefs(art.Referencias))
+          {
+            var url = r.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? r : $"https://{r}";
+            <a href="@url" target="_blank" style="margin-right:8px">@r</a>
+          }
+        </div>
+      }
+
+      <div style="margin-top:10px" class="muted">
+        Creado: @art.FechaCreacion.ToLocalTime() — Actualizado: @art.UltimaActualizacion.ToLocalTime()
+      </div>
+    </section>
+
+    <section class="content-card">
+      @if (!string.IsNullOrEmpty(okMsg)) { <div class="content-card" style="border-left:4px solid #16a34a">@okMsg</div> }
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <span>Valora:</span>
+        @for (int i = 1; i <= 5; i++)
+        {
+          <button class="btn" @onclick="() => EnviarVoto(i)" title="@i estrellas">
+            <i class="fas @(i <= voto ? "fa-star" : "fa-star-half-alt")"></i> @i
+          </button>
+        }
+      </div>
+
+      <div class="form-stack" style="margin-top:10px">
+        <textarea class="form-control" rows="3" @bind="feedback" placeholder="¿Te fue útil? Deja un comentario..."></textarea>
+        <div class="form-actions">
+          <button class="btn btn-primary" @onclick="EnviarFeedback"><i class="fas fa-paper-plane"></i> Enviar feedback</button>
+          @if (art.IncidenciaOrigenId.HasValue)
+          {
+            <a class="btn" href="@($"/incidencia/{art.IncidenciaOrigenId.Value}")"><i class="fas fa-ticket-alt"></i> Ver incidencia</a>
+          }
+        </div>
+      </div>
+    </section>
+  }
+</main>

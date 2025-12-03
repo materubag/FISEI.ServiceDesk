@@ -12,6 +12,9 @@ public class ServiciosService
 
     public async Task<List<ServicioDto>> ListarAsync()
         => await _http.GetFromJsonAsync<List<ServicioDto>>("/api/servicios") ?? new();
+
+    public async Task<ServicioDto?> ObtenerAsync(int id)
+        => await _http.GetFromJsonAsync<ServicioDto>($"/api/servicios/{id}");
 }
 
 public class ServicioDto

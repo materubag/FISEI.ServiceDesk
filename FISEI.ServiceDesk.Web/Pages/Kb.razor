@@ -1,15 +1,186 @@
 @page "/kb"
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.KnowledgeBaseService KbSvc
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
+@inject FISEI.ServiceDesk.Web.Services.CategoriasService CatSvc
+
+@code {
+    private const int PageSize = 20;
+    private bool loading = true;
+    private string? error;
+
+    private string q = "";
+    private int? servicioId;
+    private int? laboratorioId;
+    private int? categoriaId;
+
+    private List<ServicioDto> servicios = new();
+    private List<LaboratorioDto> laboratorios = new();
+    private List<CategoriaDto> categorias = new();
+
+    private Dictionary<int,string> mapServicios = new();
+    private Dictionary<int,string> mapLabs = new();
+
+    private PagedResult<KbArticuloResumenDto> result = new() { Items = new(), Total = 0, Page = 1, PageSize = PageSize };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+        await CargarCatalogos();
+        await Buscar();
+    }
+
+    private async Task CargarCatalogos()
+    {
+        try
+        {
+            var t1 = ServSvc.ListarAsync();
+            var t2 = LabSvc.ListarAsync();
+            var t3 = CatSvc.ListarAsync(); // opcional si tu API tiene categorías
+            await Task.WhenAll(t1, t2, t3);
+            servicios = t1.Result; laboratorios = t2.Result; categorias = t3.Result;
+            mapServicios = servicios.ToDictionary(x => x.Id, x => x.Nombre);
+            mapLabs = laboratorios.ToDictionary(x => x.Id, x => x.Nombre);
+        }
+        catch (Exception ex) { error = "Error cargando catálogos: " + ex.Message; }
+    }
+
+    private async Task Buscar(int page = 1)
+    {
+        loading = true; error = null;
+        try
+        {
+            result = await KbSvc.BuscarAsync(q, servicioId, laboratorioId, null, page, PageSize);
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+
+    private static IEnumerable<string> SplitTags(string? tags)
+        => string.IsNullOrWhiteSpace(tags) ? Array.Empty<string>() : tags.Split(new[]{';',','}, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private static IEnumerable<string> SplitRefs(string? refs)
+        => string.IsNullOrWhiteSpace(refs) ? Array.Empty<string>() : refs.Split(new[]{'\n',';'}, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private string NombreServicio(int? id) => (id.HasValue && mapServicios.TryGetValue(id.Value, out var n)) ? n : (id is null ? "-" : $"#{id}");
+    private string NombreLab(int? id) => (id.HasValue && mapLabs.TryGetValue(id.Value, out var n)) ? n : (id is null ? "-" : $"#{id}");
+
+    private int TotalPages => (int)Math.Ceiling((double)(result.Total ?? 0) / PageSize);
+    private bool CanPrev => result.Page > 1;
+    private bool CanNext => result.Page < TotalPages;
+    private Task Prev() => Buscar(result.Page - 1);
+    private Task Next() => Buscar(result.Page + 1);
+}
 
 <header class="institutional-header">
   <div class="header-container">
-    <div class="logo-container"><div class="uta-logo"><i class="fas fa-book"></i></div><div class="university-info"><h1>Base de Conocimiento</h1></div></div>
+    <div class="logo-container">
+      <div class="uta-logo"><i class="fas fa-book"></i></div>
+      <div class="university-info"><h1>Base de Conocimiento</h1><p>Busca soluciones y guías</p></div>
+    </div>
   </div>
 </header>
 
 <main class="main-content">
   <section class="content-card">
-    <p class="muted">Próximamente: búsqueda y artículos. Usa el menú para navegar.</p>
+    <div class="card-header">
+      <h2><i class="fas fa-search"></i> Búsqueda</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn" @onclick="() => Buscar(1)"><i class="fas fa-sync-alt"></i> Actualizar</button>
+      </div>
+    </div>
+
+    <div class="form-stack">
+      <input class="form-control" placeholder="Buscar por título o contenido..." @bind="q" />
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <InputSelect @bind-Value="servicioId" class="form-control" style="min-width:220px">
+          <option value="">Servicio (todos)</option>
+          @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
+        </InputSelect>
+
+        <InputSelect @bind-Value="laboratorioId" class="form-control" style="min-width:220px">
+          <option value="">Laboratorio (todos)</option>
+          @foreach (var l in laboratorios) { <option value="@l.Id">@l.Nombre</option> }
+        </InputSelect>
+
+        @* Si manejas categorías reales, deja este filtro *@
+        <InputSelect @bind-Value="categoriaId" class="form-control" style="min-width:220px">
+          <option value="">Categoría (todas)</option>
+          @foreach (var c in categorias) { <option value="@c.Id">@c.Nombre</option> }
+        </InputSelect>
+
+        <button class="btn btn-primary" @onclick="() => Buscar(1)"><i class="fas fa-search"></i> Buscar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (result.Items?.Count == 0) { <p class="muted">No se encontraron artículos.</p> }
+    else
+    {
+      <div style="display:grid;gap:10px">
+        @foreach (var a in result.Items)
+        {
+          <article class="card" style="padding:12px;border-left:4px solid #8B0000">
+            <header style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+              <h3 style="margin:0"><a href="@($"/kb/{a.Id}")">@a.Titulo</a></h3>
+              <span class="muted">@a.FechaCreacion.ToLocalTime()</span>
+            </header>
+
+            <p class="muted" style="margin:.25rem 0">
+              Servicio: @(a.ServicioNombre ?? NombreServicio(a.ServicioId)) •
+              Laboratorio: @(a.LaboratorioNombre ?? NombreLab(a.LaboratorioId)) •
+              Autor: @(a.AutorNombre ?? $"#{a.AutorId}")
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(a.Extracto))
+            {
+              <p style="margin:.25rem 0">@a.Extracto</p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(a.Etiquetas))
+            {
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin:.25rem 0">
+                @foreach (var tag in SplitTags(a.Etiquetas))
+                {
+                  <span style="background:#eee;border-radius:999px;padding:2px 8px;font-size:.85rem">#@tag</span>
+                }
+              </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(a.Referencias))
+            {
+              <div class="muted" style="margin:.25rem 0">
+                Referencias:
+                @foreach (var r in SplitRefs(a.Referencias))
+                {
+                  var url = r.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? r : $"https://{r}";
+                  <a href="@url" target="_blank" style="margin-right:8px">@r</a>
+                }
+              </div>
+            }
+
+            <footer style="display:flex;gap:8px;align-items:center;margin-top:6px">
+              <a class="btn" href="@($"/kb/{a.Id}")"><i class="fas fa-book-open"></i> Abrir</a>
+              @if (a.IncidenciaOrigenId.HasValue)
+              {
+                <a class="btn" href="@($"/incidencia/{a.IncidenciaOrigenId.Value}")"><i class="fas fa-ticket-alt"></i> Ver incidencia</a>
+              }
+            </footer>
+          </article>
+        }
+      </div>
+
+      <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
+        <button class="btn" disabled="@(result.Page<=1)" @onclick="Prev"><i class="fas fa-chevron-left"></i> Anterior</button>
+        <span>Página @result.Page de @TotalPages</span>
+        <button class="btn" disabled="@(!CanNext)" @onclick="Next">Siguiente <i class="fas fa-chevron-right"></i></button>
+      </div>
+    }
   </section>
 </main>
