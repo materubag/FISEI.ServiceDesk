@@ -8,37 +8,52 @@
     private bool loading = true;
     private string? error;
     private DashboardVmDto vm = new();
+    private bool redirectToLogin;
 
     protected override async Task OnInitializedAsync()
     {
-      if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+      // Evitar navegar durante la inicialización para no lanzar NavigationException.
+      if (!Auth.IsAuthenticated)
+      {
+        redirectToLogin = true;
+        return;
+      }
       try { vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value); }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+      if (firstRender && redirectToLogin)
+      {
+        try
+        {
+          Nav.NavigateTo("/login", false);
+        }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+          // Ignorar la excepción de navegación; la redirección es intencional.
+        }
+      }
+      await Task.CompletedTask;
+    }
+
     private void LogoutAndNavigate()
     {
         Auth.Logout();
+      try
+      {
         Nav.NavigateTo("/login", true);
+      }
+      catch (Microsoft.AspNetCore.Components.NavigationException)
+      {
+        // Ignore navigation exception; navigation will proceed.
+      }
     }
 }
 
-<header class="institutional-header">
-  <div class="header-container">
-    <div class="logo-container">
-      <div class="uta-logo"><i class="fas fa-university"></i></div>
-      <div class="university-info">
-        <h1>Universidad Técnica de Ambato</h1>
-        <p>Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
-      </div>
-    </div>
-      <button class="btn btn-ghost" @onclick="LogoutAndNavigate">
-        <i class="fas fa-sign-out-alt"></i>
-      </button>
-    </div>
- 
-</header>
+
 
 <nav class="main-navigation">
   <div class="nav-container">
