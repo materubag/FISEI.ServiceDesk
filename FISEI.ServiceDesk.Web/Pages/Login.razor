@@ -2,17 +2,12 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using System.ComponentModel.DataAnnotations
 @inject NavigationManager NavigationManager
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 
 <div class="min-h-screen bg-gray-100 flex flex-col">
-  <header class="bg-gradient-to-r from-red-800 to-red-900 text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-6 flex items-center gap-6">
-      <div class="w-14 h-14 rounded-full bg-white text-red-800 flex items-center justify-center shadow-lg">
-        <span class="text-2xl font-bold">UTA</span>
-      </div>
-      <div>
-        <h1 class="text-xl font-bold">Universidad Técnica de Ambato</h1>
-        <p class="text-sm opacity-90">Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
-      </div>
+  <header class="bg-white shadow-md">
+    <div class="max-w-6xl px-10 py-6 flex items-center">
+      <img src="/images/logo.png" alt="Logo UTA" class="h-20 object-contain" />
     </div>
   </header>
 
@@ -26,17 +21,17 @@
         <p class="text-sm text-gray-500 mt-1">Sistema de Gestión de Tickets - Laboratorios FISEI</p>
       </div>
       <div class="p-6">
-        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+        <EditForm Model="loginModel" OnSubmit="HandleLoginSubmit">
           <DataAnnotationsValidator />
           <ValidationSummary />
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Correo institucional</label>
-              <InputText @bind-Value="loginModel.Email" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+              <label class="block text-sm font-medium text-gray-700 ">Correo institucional</label>
+              <InputText @bind-Value="loginModel.Email" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700 text-black" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contraseña</label>
-              <InputText @bind-Value="loginModel.Password" type="password" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+              <InputText @bind-Value="loginModel.Password" type="password" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700 text-black" />
             </div>
             <div class="flex items-center justify-between">
               <label class="inline-flex items-center gap-2 text-sm text-gray-700">
@@ -46,6 +41,10 @@
               <a href="/recuperar" class="text-sm text-red-700 hover:text-red-800">¿Olvidaste tu contraseña?</a>
             </div>
             <button type="submit" class="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-2.5 rounded-md transition-colors">Ingresar</button>
+            @if (!string.IsNullOrEmpty(error))
+            {
+              <div class="mt-2 text-sm text-red-700">@error</div>
+            }
           </div>
         </EditForm>
       </div>
@@ -61,11 +60,57 @@
 
 @code {
   private LoginModel loginModel = new();
+  private string? error;
+  private bool submitting;
 
-  private Task HandleLogin()
+  protected override void OnInitialized()
   {
-    NavigationManager.NavigateTo("/");
-    return Task.CompletedTask;
+    // Si ya está autenticado, no quedarse en login
+    if (Auth.IsAuthenticated)
+    {
+      NavigationManager.NavigateTo("/", true);
+    }
+  }
+
+  private async Task HandleLogin()
+  {
+    error = null;
+    var ok = await Auth.LoginAsync(loginModel.Email, loginModel.Password);
+    if (ok)
+    {
+      var role = Auth.CurrentUserRole?.Trim();
+      string target = role?.ToLowerInvariant() switch
+      {
+        "estudiante" => "/estudiante",
+        "tecnico" => "/tecnico",
+        "administrador" => "/admin",
+        "docente" => "/docente",
+        _ => "/"
+      };
+      NavigationManager.NavigateTo(target, true);
+      // Redibujar por si el router aún mantiene la vista
+      StateHasChanged();
+      return;
+    }
+    else
+    {
+      error = Auth.LastError ?? "Credenciales inválidas o error de autenticación.";
+    }
+  }
+
+  private async Task HandleLoginSubmit(EditContext _)
+  {
+    if (submitting) return;
+    submitting = true;
+    try
+    {
+      await HandleLogin();
+    }
+    finally
+    {
+      submitting = false;
+      StateHasChanged();
+    }
   }
 
   public class LoginModel

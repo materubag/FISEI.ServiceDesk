@@ -10,13 +10,16 @@
     private List<TicketRow> tickets = new();
     private List<Stat> stats = new();
 
-  protected override void OnInitialized()
+  protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    // Redirect early to avoid NavigationException surfacing during async init/render
-    if (!Auth.IsAuthenticated)
+    if (firstRender)
     {
-      Nav.NavigateTo("/login", true);
-      return;
+      // Tras inicializar app y cargar token desde storage, valida y redirige si corresponde
+      if (!Auth.IsAuthenticated)
+      {
+        Nav.NavigateTo("/login", true);
+        return;
+      }
     }
   }
 
@@ -24,7 +27,6 @@
     {
     if (!Auth.IsAuthenticated)
     {
-      // Already handled in OnInitialized; ensure no further work
       return;
     }
         try

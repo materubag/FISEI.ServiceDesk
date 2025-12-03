@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
 using System.Net.Http;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,8 @@ var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddHttpContextAccessor();
+// Registrar almacenamiento protegido directamente cuando la extensión no está disponible
+builder.Services.AddScoped<ProtectedLocalStorage>();
 
 builder.Services.AddScoped<AuthClientService>();
 builder.Services.AddScoped<AuthHeaderHandler>();
@@ -35,6 +38,7 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
 builder.Services.AddSingleton<NotificacionesService>();
+// Do not register ProtectedLocalStorage manually; AddProtectedBrowserStorage wires it.
 
 var app = builder.Build();
 
