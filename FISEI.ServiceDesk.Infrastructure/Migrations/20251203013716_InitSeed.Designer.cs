@@ -4,6 +4,7 @@ using FISEI.ServiceDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FISEI.ServiceDesk.Infrastructure.Migrations
 {
     [DbContext(typeof(ServiceDeskDbContext))]
-    partial class ServiceDeskDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251203013716_InitSeed")]
+    partial class InitSeed
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -837,7 +840,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 1,
                             Activo = true,
                             Correo = "admin1@admin.com",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Admin 1",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -848,7 +851,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 2,
                             Activo = true,
                             Correo = "admin2@admin.com",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Admin 2",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -859,7 +862,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 3,
                             Activo = true,
                             Correo = "tecnico1@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Tecnico 1",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -870,7 +873,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 4,
                             Activo = true,
                             Correo = "tecnico2@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Tecnico 2",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -881,7 +884,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 5,
                             Activo = true,
                             Correo = "tecnico3@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Tecnico 3",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -892,7 +895,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 6,
                             Activo = true,
                             Correo = "tecnico4@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Tecnico 4",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -903,7 +906,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 7,
                             Activo = true,
                             Correo = "docente1@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Docente 1",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -914,7 +917,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 8,
                             Activo = true,
                             Correo = "docente2@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Docente 2",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -925,7 +928,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 9,
                             Activo = true,
                             Correo = "docente3@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Docente 3",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -936,7 +939,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 10,
                             Activo = true,
                             Correo = "docente4@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Docente 4",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -947,7 +950,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 11,
                             Activo = true,
                             Correo = "est1@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 1",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -958,7 +961,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 12,
                             Activo = true,
                             Correo = "est2@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 2",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -969,7 +972,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 13,
                             Activo = true,
                             Correo = "est3@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 3",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -980,7 +983,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 14,
                             Activo = true,
                             Correo = "est4@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 4",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -991,7 +994,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 15,
                             Activo = true,
                             Correo = "est5@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 5",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -1002,7 +1005,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 16,
                             Activo = true,
                             Correo = "est6@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 6",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -1013,7 +1016,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 17,
                             Activo = true,
                             Correo = "est7@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 7",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -1024,7 +1027,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 18,
                             Activo = true,
                             Correo = "est8@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 8",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -1035,7 +1038,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 19,
                             Activo = true,
                             Correo = "est9@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 9",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
@@ -1046,7 +1049,7 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                             Id = 20,
                             Activo = true,
                             Correo = "est10@uta.edu.ec",
-                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            FechaRegistro = new DateTime(2025, 12, 3, 1, 37, 15, 965, DateTimeKind.Utc).AddTicks(8376),
                             Nombre = "Estudiante 10",
                             PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
                             PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",

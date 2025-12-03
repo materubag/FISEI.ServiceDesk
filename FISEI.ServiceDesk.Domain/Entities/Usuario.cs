@@ -2,7 +2,7 @@ namespace FISEI.ServiceDesk.Domain.Entities;
 
 public class Usuario
 {
-    public int Id { get; set; } // IDENTITY
+    public int Id { get; set; }
     public string Nombre { get; set; } = default!;
     public string Correo { get; set; } = default!;
     public string PasswordHash { get; set; } = default!;

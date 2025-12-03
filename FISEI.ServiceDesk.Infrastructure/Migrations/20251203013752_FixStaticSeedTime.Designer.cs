@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FISEI.ServiceDesk.Infrastructure.Migrations
 {
     [DbContext(typeof(ServiceDeskDbContext))]
-    [Migration("20251119150517_AddRelationshipsAndKnowledgeBase")]
-    partial class AddRelationshipsAndKnowledgeBase
+    [Migration("20251203013752_FixStaticSeedTime")]
+    partial class FixStaticSeedTime
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -107,6 +107,56 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Categorias");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            Nombre = "Hardware"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            Nombre = "Software"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            Nombre = "Red"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            Nombre = "Acceso"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Activo = true,
+                            Nombre = "Audiovisual"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Activo = true,
+                            Nombre = "Climatización"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Activo = true,
+                            Nombre = "Mobiliario"
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Activo = true,
+                            Nombre = "Otro"
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.ComentarioIncidencia", b =>
@@ -201,36 +251,36 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         new
                         {
                             Id = 1,
-                            Codigo = "REPORTADO",
+                            Codigo = "ABIERTO",
                             EsFinal = false,
                             Orden = 1
                         },
                         new
                         {
                             Id = 2,
-                            Codigo = "ASIGNADO",
+                            Codigo = "EN_PROGRESO",
                             EsFinal = false,
                             Orden = 2
                         },
                         new
                         {
                             Id = 3,
-                            Codigo = "EN_PROCESO",
+                            Codigo = "RESUELTO",
                             EsFinal = false,
                             Orden = 3
                         },
                         new
                         {
                             Id = 4,
-                            Codigo = "RESUELTO",
-                            EsFinal = false,
+                            Codigo = "CERRADO",
+                            EsFinal = true,
                             Orden = 4
                         },
                         new
                         {
                             Id = 5,
-                            Codigo = "CERRADO",
-                            EsFinal = true,
+                            Codigo = "REABIERTO",
+                            EsFinal = false,
                             Orden = 5
                         });
                 });
@@ -375,6 +425,44 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Laboratorios");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            Codigo = "LAB-RED",
+                            Edificio = "FISEI",
+                            Nombre = "Lab Redes",
+                            Ubicacion = "Piso 2"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            Codigo = "LAB-SW",
+                            Edificio = "FISEI",
+                            Nombre = "Lab Software",
+                            Ubicacion = "Piso 3"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            Codigo = "LAB-HW",
+                            Edificio = "FISEI",
+                            Nombre = "Lab Hardware",
+                            Ubicacion = "Piso 1"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            Codigo = "LAB-AV",
+                            Edificio = "FISEI",
+                            Nombre = "Lab Audiovisual",
+                            Ubicacion = "Piso 4"
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Notificacion", b =>
@@ -436,6 +524,36 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Prioridades");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Nombre = "Baja",
+                            Peso = 1,
+                            TiempoMaxHoras = 168
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Nombre = "Media",
+                            Peso = 2,
+                            TiempoMaxHoras = 72
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Nombre = "Alta",
+                            Peso = 3,
+                            TiempoMaxHoras = 24
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Nombre = "Crítica",
+                            Peso = 4,
+                            TiempoMaxHoras = 4
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Rol", b =>
@@ -469,6 +587,11 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         {
                             Id = 3,
                             Nombre = "Administrador"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Nombre = "Docente"
                         });
                 });
 
@@ -502,6 +625,40 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.HasIndex("ServicioId");
 
                     b.ToTable("SLA_Definiciones");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            HorasResolucion = 4,
+                            HorasRespuesta = 0,
+                            PrioridadId = 4
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            HorasResolucion = 24,
+                            HorasRespuesta = 1,
+                            PrioridadId = 3
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            HorasResolucion = 72,
+                            HorasRespuesta = 4,
+                            PrioridadId = 2
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            HorasResolucion = 168,
+                            HorasRespuesta = 8,
+                            PrioridadId = 1
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.SLA_Incidencia", b =>
@@ -603,6 +760,36 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                     b.HasIndex("CategoriaId");
 
                     b.ToTable("Servicios");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            CategoriaId = 1,
+                            Nombre = "Soporte PC"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            CategoriaId = 3,
+                            Nombre = "Red/Conectividad"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            CategoriaId = 2,
+                            Nombre = "Software"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            CategoriaId = 5,
+                            Nombre = "Audiovisual"
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.Usuario", b =>
@@ -646,6 +833,228 @@ namespace FISEI.ServiceDesk.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Usuarios");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Activo = true,
+                            Correo = "admin1@admin.com",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Admin 1",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 3
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Activo = true,
+                            Correo = "admin2@admin.com",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Admin 2",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 3
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Activo = true,
+                            Correo = "tecnico1@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Tecnico 1",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 2
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Activo = true,
+                            Correo = "tecnico2@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Tecnico 2",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 2
+                        },
+                        new
+                        {
+                            Id = 5,
+                            Activo = true,
+                            Correo = "tecnico3@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Tecnico 3",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 2
+                        },
+                        new
+                        {
+                            Id = 6,
+                            Activo = true,
+                            Correo = "tecnico4@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Tecnico 4",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 2
+                        },
+                        new
+                        {
+                            Id = 7,
+                            Activo = true,
+                            Correo = "docente1@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Docente 1",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 4
+                        },
+                        new
+                        {
+                            Id = 8,
+                            Activo = true,
+                            Correo = "docente2@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Docente 2",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 4
+                        },
+                        new
+                        {
+                            Id = 9,
+                            Activo = true,
+                            Correo = "docente3@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Docente 3",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 4
+                        },
+                        new
+                        {
+                            Id = 10,
+                            Activo = true,
+                            Correo = "docente4@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Docente 4",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 4
+                        },
+                        new
+                        {
+                            Id = 11,
+                            Activo = true,
+                            Correo = "est1@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 1",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 12,
+                            Activo = true,
+                            Correo = "est2@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 2",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 13,
+                            Activo = true,
+                            Correo = "est3@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 3",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 14,
+                            Activo = true,
+                            Correo = "est4@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 4",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 15,
+                            Activo = true,
+                            Correo = "est5@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 5",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 16,
+                            Activo = true,
+                            Correo = "est6@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 6",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 17,
+                            Activo = true,
+                            Correo = "est7@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 7",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 18,
+                            Activo = true,
+                            Correo = "est8@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 8",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 19,
+                            Activo = true,
+                            Correo = "est9@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 9",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        },
+                        new
+                        {
+                            Id = 20,
+                            Activo = true,
+                            Correo = "est10@uta.edu.ec",
+                            FechaRegistro = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Nombre = "Estudiante 10",
+                            PasswordHash = "7bLj4V/UqVZU/y/tYw/jheG+yr1QU1KyWjfOZaCKuKY=",
+                            PasswordSalt = "lOvvglGCDYWu2T3sCDzE1A==",
+                            RolId = 1
+                        });
                 });
 
             modelBuilder.Entity("FISEI.ServiceDesk.Domain.Entities.ArticuloConocimiento", b =>
