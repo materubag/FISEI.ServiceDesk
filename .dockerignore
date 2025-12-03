@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/.vscode/
+*.user
+*.swp
+*.log
+*.pdb
+node_modules/

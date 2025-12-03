@@ -1,0 +1,47 @@
+@page "/"
+@using FISEI.ServiceDesk.Web.Services
+@inject AuthClientService Auth
+@inject NotificacionesService Notif
+@inject HttpClient Http
+
+<div class="p-6 space-y-4">
+    @if (!Auth.IsAuthenticated)
+    {
+        <div class="card space-y-3 max-w-md">
+            <h1 class="text-2xl font-semibold">Bienvenido</h1>
+            <p class="muted">Inicia sesión para acceder al ServiceDesk.</p>
+            <a href="/login" class="btn btn-primary w-full">Ir al Login</a>
+        </div>
+    }
+    else
+    {
+        <h1 class="text-xl font-semibold">Panel</h1>
+        <p>Usuario: @Auth.CurrentUserId (@Auth.CurrentUserRole)</p>
+        <button class="btn btn-secondary" @onclick="Logout">Logout</button>
+        <div class="mt-4">
+            <NotificacionesBadge />
+        </div>
+        @if (!Notif.Conectado)
+        {
+            <p class="text-sm text-slate-400">Conectando a notificaciones...</p>
+        }
+    }
+</div>
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Auth.IsAuthenticated && !Notif.Conectado)
+        {
+            // Ajustar URL del hub cuando esté detrás de reverse proxy / variable env
+            await Notif.ConectarAsync("/hubs/notificaciones", () => Task.FromResult(Auth.GetToken()));
+            StateHasChanged();
+        }
+    }
+
+    private void Logout()
+    {
+        Auth.Logout();
+        StateHasChanged();
+    }
+}

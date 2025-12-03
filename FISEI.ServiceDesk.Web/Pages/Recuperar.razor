@@ -1,0 +1,27 @@
+@page "/recuperar"
+@inject NavigationManager Nav
+
+<div class="layout-center">
+  <div class="w-full max-w-md fade-in space-y-6">
+    <div class="text-center space-y-1">
+      <div class="logo-mark">ServiceDesk</div>
+      <p class="muted">Recuperar contraseña</p>
+    </div>
+
+    <div class="card space-y-4">
+      <h1 class="text-xl font-semibold">¿Olvidaste tu contraseña?</h1>
+      <p class="text-sm text-slate-300 leading-relaxed">
+        Contacta con soporte TI indicando tu correo institucional para asistencia.
+      </p>
+      <div class="bg-[#182542] border border-[#24355d] rounded-lg p-3 text-xs text-slate-300">
+        Correo de soporte: <span class="font-medium text-brand-500">soporte@fisei.edu.ec</span><br />
+        Horario: 08h00 – 17h00
+      </div>
+      <button class="btn w-full" @onclick='() => Nav.NavigateTo("/login")'>Volver al login</button>
+    </div>
+
+    <p class="muted text-center text-xs">
+      © @DateTime.UtcNow.Year FISEI – Mesa de Ayuda
+    </p>
+  </div>
+</div>

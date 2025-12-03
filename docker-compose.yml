@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: FISEI.ServiceDesk.Api/Dockerfile
+    container_name: sd_api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=ServiceDeskDB;User ID=sa;Password=SdStrongPass!2025;TrustServerCertificate=True;
+    ports:
+      - "8070:8080"
+    depends_on:
+      - sqlserver
+    networks:
+      - sd_net
+
+  web:
+    build:
+      context: .
+      dockerfile: FISEI.ServiceDesk.Web/Dockerfile
+    container_name: sd_web
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - API_BASE_URL=http://api:8080/
+    ports:
+      - "8090:8080"
+    depends_on:
+      - api
+    networks:
+      - sd_net
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sd_sql
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=SdStrongPass!2025
+    ports:
+      - "14333:1433"
+    volumes:
+      - sd_sql_data:/var/opt/mssql
+    networks:
+      - sd_net
+
+volumes:
+  sd_sql_data:
+
+networks:
+  sd_net:

@@ -1,28 +1,53 @@
-using FISEI.ServiceDesk.Web.Components;
+using FISEI.ServiceDesk.Web.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System;
+using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+var apiBaseUrl = Environment.GetEnvironmentVariable("API_BASE_URL")
+    ?? (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"
+        ? "http://api:8080/"
+        : "http://localhost:8070/");
+
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddScoped<AuthClientService>();
+builder.Services.AddScoped<AuthHeaderHandler>();
+
+// Cliente para AUTH (sin handler)
+builder.Services.AddHttpClient("Auth", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+});
+
+// Cliente para API (con bearer automático)
+builder.Services.AddHttpClient("Api", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+}).AddHttpMessageHandler<AuthHeaderHandler>();
+
+// HttpClient “por defecto” usará el cliente Api
+builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
+
+builder.Services.AddSingleton<NotificacionesService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseRouting();
 
-
-app.UseAntiforgery();
-
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
 
 app.Run();

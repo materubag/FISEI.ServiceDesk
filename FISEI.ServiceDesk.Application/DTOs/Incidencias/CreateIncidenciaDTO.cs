@@ -1,0 +1,11 @@
+namespace FISEI.ServiceDesk.Application.DTOs.Incidencias;
+
+public class CreateIncidenciaDto
+{
+    public int CreadorId { get; set; }
+    public string Titulo { get; set; } = default!;
+    public string Descripcion { get; set; } = default!;
+    public int PrioridadId { get; set; }
+    public int ServicioId { get; set; }
+    public int? LaboratorioId { get; set; } // NUEVO: opcional
+}

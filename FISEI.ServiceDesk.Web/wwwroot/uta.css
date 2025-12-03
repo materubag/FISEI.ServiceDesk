@@ -1,0 +1,53 @@
+:root{
+  --uta-rojo:#8B0000; --uta-rojo-dark:#5c0000; --gris:#2c2c2c; --gris-m:#555; --gris-l:#f8f9fa; --white:#fff;
+  --radius:10px; --shadow:0 4px 10px rgba(0,0,0,.08); --font:'Inter',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box} body{margin:0;font-family:var(--font);color:var(--gris);background:var(--gris-l)}
+.institutional-header{background:linear-gradient(135deg,var(--uta-rojo),var(--uta-rojo-dark));color:var(--white);padding:18px 0;box-shadow:var(--shadow)}
+.header-container{max-width:1200px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.logo-container{display:flex;align-items:center;gap:14px}
+.uta-logo{width:56px;height:56px;border-radius:50%;background:var(--white);color:var(--uta-rojo);display:grid;place-items:center;font-size:1.2rem;box-shadow:var(--shadow)}
+.university-info h1{margin:0;font-size:1.05rem;color:var(--white);font-weight:700}
+.university-info p{margin:0;font-size:.85rem;opacity:.95}
+.user-info{display:flex;align-items:center;gap:10px}
+.user-avatar-placeholder{width:36px;height:36px;border-radius:50%;background:#eee;display:grid;place-items:center;font-weight:600}
+.user-meta{font-size:.85rem}
+.main-navigation{background:var(--white);border-bottom:1px solid #e8eaef;position:sticky;top:0;z-index:10}
+.nav-container{max-width:1200px;margin:0 auto;padding:0 16px}
+.nav-menu{display:flex;gap:6px;list-style:none;margin:0;padding:0}
+.nav-menu a{display:flex;align-items:center;gap:8px;padding:10px 12px;color:var(--gris-m);text-decoration:none;border-radius:8px}
+.nav-menu a.active,.nav-menu a:hover{background:rgba(139,0,0,.08);color:var(--uta-rojo)}
+.main-content{max-width:1200px;margin:18px auto;padding:0 16px}
+.section-title{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media(max-width:960px){.stats-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.stats-grid{grid-template-columns:1fr}}
+.stat-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e8eaef;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+.stat-icon{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;color:#fff}
+.stat-primary .stat-icon{background:#8B0000}
+.stat-warning .stat-icon{background:#eab308}
+.stat-success .stat-icon{background:#16a34a}
+.stat-danger .stat-icon{background:#dc2626}
+.stat-content h3{margin:0 0 4px;font-size:.95rem}
+.stat-number{font-weight:700}
+.card{background:#fff;border:1px solid #e8eaef;border-radius:var(--radius);box-shadow:var(--shadow)}
+.login-card{width:min(440px,92vw);padding:16px}
+.card-title{margin:0 0 12px}
+.center-page{min-height:calc(100vh - 120px);display:grid;place-items:center;padding:16px}
+.form-stack{display:grid;gap:12px}
+.form-label{display:grid;gap:6px;font-size:.95rem}
+.form-control{width:100%;padding:10px 12px;border:1px solid #d6dae3;border-radius:10px;background:#fff;color:#1f2937}
+.form-actions{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;border:1px solid #d6dae3;background:#fff;cursor:pointer}
+.btn-ghost{background:transparent;border:1px solid transparent;color:#fff}
+.btn-primary{background:var(--uta-rojo);border-color:var(--uta-rojo);color:#fff}
+.btn-primary:hover{background:#a61e1e}
+.link-inline{color:#8B0000;text-decoration:none}
+.link-inline:hover{text-decoration:underline}
+.muted{color:#666}.small{font-size:.85rem}
+.content-card{background:#fff;border:1px solid #e8eaef;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-top:14px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.table-container{overflow:auto;border:1px solid #e8eaef;border-radius:10px}
+.data-table{width:100%;border-collapse:collapse;min-width:720px}
+.data-table th,.data-table td{padding:10px 12px;border-bottom:1px solid #eef1f6;text-align:left}
+.alert-error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:10px;padding:10px}

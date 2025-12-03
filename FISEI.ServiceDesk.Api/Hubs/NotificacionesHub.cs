@@ -1,0 +1,25 @@
+using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
+
+namespace FISEI.ServiceDesk.Api.Hubs;
+
+public class NotificacionesHub : Hub
+{
+    public override async Task OnConnectedAsync()
+    {
+        var user = Context.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var sub = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? user.FindFirst("sub")?.Value;
+            if (int.TryParse(sub, out var userId))
+            {
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"USER_{userId}");
+            }
+
+            var role = user.FindFirstValue(ClaimTypes.Role);
+            if (role == "Tecnico" || role == "Administrador")
+                await Groups.AddToGroupAsync(Context.ConnectionId, "ROL_TECNICO");
+        }
+        await base.OnConnectedAsync();
+    }
+}

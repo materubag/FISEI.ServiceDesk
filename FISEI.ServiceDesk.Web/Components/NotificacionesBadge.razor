@@ -1,0 +1,25 @@
+@using FISEI.ServiceDesk.Web.Services
+@inject NotificacionesService Notif
+
+<div class="noti-badge">
+    @if (Notif.Conectado)
+    {
+        <span class="badge bg-success">Notificaciones conectadas</span>
+    }
+    else
+    {
+        <span class="badge bg-warning">Sin conexión</span>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Notif.OnMensajeCrudo += _ => InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Notif.OnMensajeCrudo -= _ => InvokeAsync(StateHasChanged);
+    }
+}

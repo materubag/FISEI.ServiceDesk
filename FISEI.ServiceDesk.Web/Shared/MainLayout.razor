@@ -1,0 +1,41 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+
+<div class="min-h-screen flex flex-col">
+    <header class="px-4 py-3 bg-[#101a33] border-b border-[#1e2a44] flex items-center justify-between">
+        <div class="text-lg font-semibold">
+            <a href="/">ServiceDesk</a>
+        </div>
+        <nav class="flex items-center gap-4 text-sm">
+            @if (Auth.IsAuthenticated)
+            {
+                <a href="/incidencias">Incidencias</a>
+                <span class="text-slate-400">
+                    Usuario: @Auth.CurrentUserName (@Auth.CurrentUserRole)
+                </span>
+                <button class="btn btn-sm" @onclick="Logout">Salir</button>
+            }
+            else
+            {
+                <a href="/login">Login</a>
+            }
+        </nav>
+    </header>
+
+    <main class="flex-1">
+        @Body
+    </main>
+
+    <footer class="px-4 py-3 text-center text-xs text-slate-500 border-t border-[#1e2a44]">
+        © @DateTime.UtcNow.Year FISEI Mesa de Ayuda
+    </footer>
+</div>
+
+@code {
+    private void Logout()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+}
