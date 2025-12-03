@@ -1,13 +1,23 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 
+<div class="page">
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <a class="text-sm font-semibold" href="/">ServiceDesk</a>
+            <div class="flex items-center gap-3">
+                @if (Auth.IsAuthenticated)
+                {
+                    <span class="text-xs opacity-80">@Auth.CurrentUserName (@Auth.CurrentUserRole)</span>
+                    <a class="text-sm" href="#" @onclick="OnLogoutClicked">Salir</a>
+                }
+                else
+                {
+                    <a class="text-sm" href="/login">Login</a>
+                }
+            </div>
         </div>
 
         <article class="content px-4">
@@ -15,6 +25,14 @@
         </article>
     </main>
 </div>
+
+@code {
+    private void OnLogoutClicked()
+    {
+        Auth.Logout();
+        Nav.NavigateTo("/login", true);
+    }
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

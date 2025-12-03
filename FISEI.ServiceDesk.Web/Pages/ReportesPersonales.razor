@@ -1,0 +1,61 @@
+@page "/reportes/personales"
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.ReportesService Reports
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private ReportePersonalDto data = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+        try { data = await Reports.ObtenerReportePersonalAsync(Auth.CurrentUserId!.Value); }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-chart-line"></i></div><div class="university-info"><h1>Mis Reportes</h1></div></div>
+    <NotificacionesBadge />
+  </div>
+</header>
+
+<main class="main-content">
+  @if (loading) { <p class="muted">Cargando...</p> }
+  else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+  else
+  {
+    <section class="stats-grid">
+      <div class="stat-card stat-primary"><div class="stat-icon"><i class="fas fa-folder-open"></i></div><div class="stat-content"><h3>Abiertos</h3><span class="stat-number">@data.Abiertos</span></div></div>
+      <div class="stat-card stat-warning"><div class="stat-icon"><i class="fas fa-spinner"></i></div><div class="stat-content"><h3>En Progreso</h3><span class="stat-number">@data.EnProgreso</span></div></div>
+      <div class="stat-card stat-success"><div class="stat-icon"><i class="fas fa-check"></i></div><div class="stat-content"><h3>Resueltos</h3><span class="stat-number">@data.Resueltos</span></div></div>
+      <div class="stat-card stat-danger"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><h3>Fuera SLA</h3><span class="stat-number">@data.FueraSla</span></div></div>
+    </section>
+
+    <section class="content-card">
+      <div class="card-header"><h2><i class="fas fa-history"></i> Historial reciente</h2></div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Estado</th><th>Tiempo Resolución</th></tr></thead>
+          <tbody>
+            @foreach (var i in data.Recientes)
+            {
+              <tr>
+                <td><a href="@($"/incidencia/{i.Id}")">@i.Id</a></td>
+                <td>@i.FechaCreacion.ToLocalTime()</td>
+                <td>@i.ServicioNombre</td>
+                <td>@i.Titulo</td>
+                <td>@i.EstadoNombre</td>
+                <td>@(i.TiempoResolucionHoras is null ? "-" : $"{i.TiempoResolucionHoras:F1} h")</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</main>

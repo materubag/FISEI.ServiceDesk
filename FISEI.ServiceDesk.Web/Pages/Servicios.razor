@@ -1,0 +1,42 @@
+@page "/servicios"
+@using FISEI.ServiceDesk.Web.Services
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private List<ServicioDto> items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+        try { items = await ServSvc.ListarAsync(); }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-cogs"></i></div><div class="university-info"><h1>Servicios</h1></div></div>
+  </div>
+</header>
+
+<main class="main-content">
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (items.Count == 0) { <p class="muted">No hay servicios</p> }
+    else
+    {
+      <ul>
+        @foreach (var s in items)
+        {
+          <li><b>@s.Nombre</b> — @s.Descripcion</li>
+        }
+      </ul>
+    }
+  </section>
+</main>

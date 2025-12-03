@@ -1,0 +1,175 @@
+@page "/incidencias"
+@using FISEI.ServiceDesk.Web.Services
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.PrioridadesService PriSvc
+@inject FISEI.ServiceDesk.Web.Services.EstadosService EstSvc
+@using System.Linq
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private List<IncidenciaResumenDto> items = new();
+    private string filtroTexto = "";
+    private int? filtroEstadoId;
+    private int? filtroPrioridadId;
+
+    private List<ServicioDto> servicios = new();
+    private List<PrioridadDto> prioridades = new();
+    private List<EstadoDto> estados = new();
+
+    private Dictionary<int,string> mapServicios = new();
+    private Dictionary<int,string> mapPrioridades = new();
+    private Dictionary<int,string> mapEstados = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+
+        try
+        {
+            if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+            var t1 = ServSvc.ListarAsync();
+            var t2 = PriSvc.ListarAsync();
+            var t3 = EstSvc.ListarAsync();
+            await Task.WhenAll(t1, t2, t3);
+
+            servicios = t1.Result; prioridades = t2.Result; estados = t3.Result;
+            mapServicios = servicios.ToDictionary(x => x.Id, x => x.Nombre);
+            mapPrioridades = prioridades.ToDictionary(x => x.Id, x => x.Nombre);
+            mapEstados = estados.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+        }
+        catch (Exception ex) { error = "Error cargando catálogos: " + ex.Message; }
+
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        loading = true; error = null;
+        try
+        {
+            items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
+            await ResolverNombresFaltantes();
+        }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+
+    private async Task ResolverNombresFaltantes()
+    {
+        // Servicio
+        var faltanServ = items.Select(i => (i.ServicioId, i.ServicioNombre))
+                              .Where(x => string.IsNullOrWhiteSpace(x.ServicioNombre) && !mapServicios.ContainsKey(x.ServicioId))
+                              .Select(x => x.ServicioId).Distinct().ToList();
+        foreach (var id in faltanServ)
+        {
+            var dto = await ServSvc.ObtenerAsync(id);
+            if (dto != null) mapServicios[id] = dto.Nombre;
+        }
+
+        // Prioridad
+        var faltanPri = items.Select(i => (i.PrioridadId, i.PrioridadNombre))
+                             .Where(x => string.IsNullOrWhiteSpace(x.PrioridadNombre) && !mapPrioridades.ContainsKey(x.PrioridadId))
+                             .Select(x => x.PrioridadId).Distinct().ToList();
+        foreach (var id in faltanPri)
+        {
+            var dto = await PriSvc.ObtenerAsync(id);
+            if (dto != null) mapPrioridades[id] = dto.Nombre;
+        }
+
+        // Estado
+        var faltanEst = items.Select(i => (i.EstadoId, i.EstadoNombre))
+                             .Where(x => string.IsNullOrWhiteSpace(x.EstadoNombre) && !mapEstados.ContainsKey(x.EstadoId))
+                             .Select(x => x.EstadoId).Distinct().ToList();
+        foreach (var id in faltanEst)
+        {
+          var dto = await EstSvc.ObtenerAsync(id);
+          if (dto != null)
+          {
+            var nombre = !string.IsNullOrWhiteSpace(dto.Nombre) ? dto.Nombre : (dto.Codigo ?? $"#{id}");
+            mapEstados[id] = nombre;
+          }
+        }
+
+        StateHasChanged();
+    }
+
+    private string NombreServicio(IncidenciaResumenDto i)
+        => !string.IsNullOrWhiteSpace(i.ServicioNombre) ? i.ServicioNombre
+         : mapServicios.TryGetValue(i.ServicioId, out var n) ? n : $"#{i.ServicioId}";
+
+    private string NombrePrioridad(IncidenciaResumenDto i)
+        => !string.IsNullOrWhiteSpace(i.PrioridadNombre) ? i.PrioridadNombre
+         : mapPrioridades.TryGetValue(i.PrioridadId, out var n) ? n : $"#{i.PrioridadId}";
+
+    private string NombreEstado(IncidenciaResumenDto i)
+        => !string.IsNullOrWhiteSpace(i.EstadoNombre) ? i.EstadoNombre
+         : mapEstados.TryGetValue(i.EstadoId, out var n) ? n : $"#{i.EstadoId}";
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-university"></i></div><div class="university-info"><h1>Incidencias</h1><p>Listado y filtros</p></div></div>
+    <a class="btn btn-primary" href="/incidencia/nueva"><i class="fas fa-plus"></i> Nueva</a>
+  </div>
+</header>
+
+<main class="main-content">
+  <section class="content-card">
+    <div class="card-header">
+      <h2><i class="fas fa-filter"></i> Filtros</h2>
+      <button class="btn" @onclick="Cargar"><i class="fas fa-sync-alt"></i> Actualizar</button>
+    </div>
+    <div class="form-stack">
+      <input class="form-control" placeholder="Buscar..." @bind="filtroTexto" />
+      <div style="display:flex;gap:8px;align-items:center">
+        <InputSelect @bind-Value="filtroEstadoId" class="form-control">
+          <option value="">Estado (todos)</option>
+          @foreach (var e in estados)
+          {
+            <option value="@e.Id">@e.Nombre</option>
+          }
+        </InputSelect>
+        <InputSelect @bind-Value="filtroPrioridadId" class="form-control">
+          <option value="">Prioridad (todas)</option>
+          @foreach (var p in prioridades)
+          {
+            <option value="@p.Id">@p.Nombre</option>
+          }
+        </InputSelect>
+        <button class="btn btn-primary" @onclick="Cargar"><i class="fas fa-search"></i> Aplicar</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (items.Count == 0) { <p class="muted">Sin resultados</p> }
+    else
+    {
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Prioridad</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            @foreach (var t in items)
+            {
+              <tr>
+                <td>@t.Id</td>
+                <td>@t.FechaCreacion.ToLocalTime()</td>
+                <td>@NombreServicio(t)</td>
+                <td>@t.Titulo</td>
+                <td>@NombrePrioridad(t)</td>
+                <td>@NombreEstado(t)</td>
+                <td><a class="btn" href="@($"/incidencia/{t.Id}")"><i class="fas fa-eye"></i> Ver</a></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>
