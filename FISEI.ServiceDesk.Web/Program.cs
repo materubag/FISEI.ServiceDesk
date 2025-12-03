@@ -35,6 +35,8 @@ builder.Services.AddHttpClient("Api", client =>
 builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Api"));
 
 builder.Services.AddSingleton<NotificacionesService>();
+builder.Services.AddScoped<IncidenciasService>();
+builder.Services.AddScoped<ServiciosService>();
 
 var app = builder.Build();
 

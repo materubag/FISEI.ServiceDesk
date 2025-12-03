@@ -1,0 +1,92 @@
+@page "/incidencias"
+@using FISEI.ServiceDesk.Web.Services
+@inject NavigationManager Nav
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
+
+@code {
+    private bool loading = true;
+    private string? error;
+    private List<IncidenciaResumenDto> items = new();
+    private string filtroTexto = "";
+    private int? filtroEstadoId;
+    private int? filtroPrioridadId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        loading = true; error = null;
+        try { items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId); }
+        catch (Exception ex) { error = ex.Message; }
+        finally { loading = false; }
+    }
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-university"></i></div><div class="university-info"><h1>Incidencias</h1><p>Listado y filtros</p></div></div>
+    <a class="btn btn-primary" href="/incidencia/nueva"><i class="fas fa-plus"></i> Nueva</a>
+  </div>
+</header>
+
+<main class="main-content">
+  <section class="content-card">
+    <div class="card-header">
+      <h2><i class="fas fa-filter"></i> Filtros</h2>
+      <button class="btn" @onclick="Cargar"><i class="fas fa-sync-alt"></i> Actualizar</button>
+    </div>
+    <div class="form-stack">
+      <input class="form-control" placeholder="Buscar..." @bind="filtroTexto" />
+      <div style="display:flex;gap:8px">
+        <select class="form-control" @bind="filtroEstadoId">
+          <option value="">Estado (todos)</option>
+          <option value="1">Abierto</option>
+          <option value="2">En Progreso</option>
+          <option value="3">Resuelto</option>
+          <option value="4">Cerrado</option>
+        </select>
+        <select class="form-control" @bind="filtroPrioridadId">
+          <option value="">Prioridad (todas)</option>
+          <option value="1">Baja</option>
+          <option value="2">Media</option>
+          <option value="3">Alta</option>
+          <option value="4">Crítica</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" @onclick="Cargar"><i class="fas fa-search"></i> Aplicar</button>
+    </div>
+  </section>
+
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (items.Count == 0) { <p class="muted">Sin resultados</p> }
+    else
+    {
+      <div class="table-container">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Prioridad</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            @foreach (var t in items)
+            {
+              <tr>
+                <td>@t.Id</td>
+                <td>@t.FechaCreacion.ToLocalTime()</td>
+                <td>@t.ServicioNombre</td>
+                <td>@t.Titulo</td>
+                <td>@t.PrioridadNombre</td>
+                <td>@t.EstadoNombre</td>
+                <td><a class="btn" href="@($"/incidencia/{t.Id}")"><i class="fas fa-eye"></i> Ver</a></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</main>
