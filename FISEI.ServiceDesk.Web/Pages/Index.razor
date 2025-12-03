@@ -21,6 +21,7 @@
       try { vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value); }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
+
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
