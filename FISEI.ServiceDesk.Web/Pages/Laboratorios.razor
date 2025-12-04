@@ -3,17 +3,7 @@
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 @inject LaboratoriosService LabSvc
-<nav class="main-navigation">
-  <div class="nav-container">
-    <ul class="nav-menu">
-      <li><a href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
-      <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
-      <li><a href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
-      <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
-      <li><a class="active" href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
-    </ul>
-  </div>
-</nav>
+<RoleNav />
 
 <main class="main-content">
   <section class="content-card">

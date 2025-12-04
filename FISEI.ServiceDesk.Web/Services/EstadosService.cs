@@ -34,4 +34,5 @@ public class EstadoDto
     // Algunos controladores exponen 'Codigo' en lugar de 'Nombre'
     public string? Nombre { get; set; }
     public string? Codigo { get; set; }
+    public bool EsFinal { get; set; }
 }

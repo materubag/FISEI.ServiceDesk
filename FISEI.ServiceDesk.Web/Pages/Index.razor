@@ -14,6 +14,9 @@
     private Dictionary<int,string> mapServicios = new();
     private Dictionary<int,string> mapPrioridades = new();
     private Dictionary<int,string> mapEstados = new();
+    private List<EstadoDto> estados = new();
+    private List<PrioridadDto> prioridades = new();
+    private List<IncidenciaResumenDto> incidencias = new();
     
     // Estado modal detalle
     private bool mostrarDetalle = false;
@@ -21,13 +24,70 @@
     private IncidenciaDetalleDto? incDetalle;
     private string nuevoComentario = "";
 
+    private bool EsRol(string r)
+      => string.Equals(Auth.CurrentUserRole, r, StringComparison.OrdinalIgnoreCase);
+    private bool EsAdmin
+      => EsRol("ADMINISTRADOR") || EsRol("ADMIN") || EsRol("Administrador") || EsRol("Admin");
+    private bool EsTecnico
+      => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
+    private bool EsEstudianteODocente
+      => EsRol("ESTUDIANTE") || EsRol("DOCENTE") || EsRol("Estudiante") || EsRol("Docente");
+
     protected override async Task OnInitializedAsync()
     {
       
       try {
         if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
-        vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value);
         await CargarCatalogosYResolverNombres();
+
+        // Cargar incidencias según rol
+        if (EsAdmin || EsTecnico)
+        {
+          incidencias = await IncSvc.ListarTodasAsync(null, null, null, page: 1, pageSize: 500);
+        }
+        else
+        {
+          incidencias = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, null, null, null);
+        }
+
+        // Calcular dashboard desde incidencias + catálogo de estados
+        vm = new DashboardVmDto();
+        vm.Activos = incidencias.Count;
+        vm.Recientes = incidencias.OrderByDescending(i => i.FechaCreacion).Take(5).ToList();
+        // Completar nombres visibles para recientes con catálogos cargados
+        foreach (var i in vm.Recientes)
+        {
+          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
+          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
+          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
+        }
+
+        Func<int, bool> esProgreso = (eid) =>
+        {
+          var e = estados.FirstOrDefault(x => x.Id == eid);
+          var codigo = e?.Codigo ?? string.Empty;
+          var nombre = e?.Nombre ?? string.Empty;
+          return (!string.IsNullOrWhiteSpace(codigo) && (codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase) || codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
+                 || (!string.IsNullOrWhiteSpace(nombre) && (nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase) || nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase)));
+        };
+        Func<int, bool> esResuelto = (eid) =>
+        {
+          var e = estados.FirstOrDefault(x => x.Id == eid);
+          var codigo = e?.Codigo ?? string.Empty;
+          var nombre = e?.Nombre ?? string.Empty;
+          return string.Equals(codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+                 || (!string.IsNullOrWhiteSpace(nombre) && nombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase));
+        };
+
+        vm.EnProgreso = incidencias.Count(i => esProgreso(i.EstadoId));
+        vm.ResueltosMes = incidencias.Count(i => esResuelto(i.EstadoId) && i.FechaCreacion >= DateTime.UtcNow.AddDays(-30));
+
+        vm.Criticos = incidencias.Count(i =>
+        {
+          var pn = i.PrioridadNombre ?? mapPrioridades.GetValueOrDefault(i.PrioridadId);
+          var norm = (pn ?? string.Empty).ToUpperInvariant();
+          return norm.Contains("CRIT");
+        });
       }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
@@ -41,18 +101,40 @@
         var t2 = PriSvc.ListarAsync();
         var t3 = EstSvc.ListarAsync();
         await Task.WhenAll(t1, t2, t3);
-        mapServicios = t1.Result.ToDictionary(x => x.Id, x => x.Nombre);
-        mapPrioridades = t2.Result.ToDictionary(x => x.Id, x => x.Nombre);
-        mapEstados = t3.Result.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
-
-        foreach (var i in vm.Recientes)
-        {
-          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
-          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
-          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
-        }
+        var serviciosList = t1.Result;
+        prioridades = t2.Result;
+        estados = t3.Result;
+        mapServicios = serviciosList.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+        mapPrioridades = prioridades.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+        mapEstados = estados.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+        // Resolveremos nombres para 'vm.Recientes' cuando se calcule luego de cargar incidencias
       }
       catch { /* silencioso: mostramos IDs si falta */ }
+    }
+
+    private void IrIncidencias() => Nav.NavigateTo("/incidencias");
+    private void IrIncidenciasEnProgreso()
+    {
+      var e = estados.FirstOrDefault(x =>
+        (!string.IsNullOrWhiteSpace(x.Codigo) &&
+          (string.Equals(x.Codigo, "EN_PROGRESO", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(x.Codigo, "EN_PROCESO", StringComparison.OrdinalIgnoreCase)
+           || x.Codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase)
+           || x.Codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
+        || (!string.IsNullOrWhiteSpace(x.Nombre) && (x.Nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase) || x.Nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase))));
+      if (e is not null) Nav.NavigateTo($"/incidencias?estadoId={e.Id}"); else IrIncidencias();
+    }
+    private void IrIncidenciasResueltos()
+    {
+      var e = estados.FirstOrDefault(x => string.Equals(x.Codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+                                       || (!string.IsNullOrWhiteSpace(x.Nombre) && x.Nombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase)));
+      if (e is not null) Nav.NavigateTo($"/incidencias?estadoId={e.Id}"); else IrIncidencias();
+    }
+    private static string QNorm(string s) => s.ToUpperInvariant().Replace("Í","I").Replace("Á","A").Replace("É","E").Replace("Ó","O").Replace("Ú","U");
+    private void IrIncidenciasCriticos()
+    {
+      var p = prioridades.FirstOrDefault(x => QNorm(x.Nombre).Contains("CRIT"));
+      if (p is not null) Nav.NavigateTo($"/incidencias?prioridadId={p.Id}"); else IrIncidencias();
     }
 
     private void LogoutAndNavigate()
@@ -96,17 +178,7 @@
     }
 }
 
-<nav class="main-navigation">
-  <div class="nav-container">
-    <ul class="nav-menu">
-      <li><a class="active" href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
-      <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
-      <li><a href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
-      <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
-      <li><a href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
-    </ul>
-  </div>
-</nav>
+<RoleNav />
 
 <main class="main-content">
   <section class="content-card">
@@ -133,43 +205,43 @@
     else
     {
       <div class="stats-grid">
-        <div class="stat-card stat-activos">
+        <div class="stat-card stat-activos" style="cursor:pointer" @onclick="IrIncidencias">
           <div class="stat-icon">
             <i class="fas fa-ticket-alt"></i>
           </div>
           <div class="stat-content">
             <span class="stat-label">Activas</span>
-            <span class="stat-value">@vm.Activos</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidencias">@vm.Activos</a></span>
           </div>
         </div>
 
-        <div class="stat-card stat-progreso">
+        <div class="stat-card stat-progreso" style="cursor:pointer" @onclick="IrIncidenciasEnProgreso">
           <div class="stat-icon">
             <i class="fas fa-clock"></i>
           </div>
           <div class="stat-content">
             <span class="stat-label">En Progreso</span>
-            <span class="stat-value">@vm.EnProgreso</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasEnProgreso">@vm.EnProgreso</a></span>
           </div>
         </div>
 
-        <div class="stat-card stat-resueltos">
+        <div class="stat-card stat-resueltos" style="cursor:pointer" @onclick="IrIncidenciasResueltos">
           <div class="stat-icon">
             <i class="fas fa-check-circle"></i>
           </div>
           <div class="stat-content">
             <span class="stat-label">Resueltos (mes)</span>
-            <span class="stat-value">@vm.ResueltosMes</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasResueltos">@vm.ResueltosMes</a></span>
           </div>
         </div>
 
-        <div class="stat-card stat-criticos">
+        <div class="stat-card stat-criticos" style="cursor:pointer" @onclick="IrIncidenciasCriticos">
           <div class="stat-icon">
             <i class="fas fa-exclamation-triangle"></i>
           </div>
           <div class="stat-content">
             <span class="stat-label">Críticos</span>
-            <span class="stat-value">@vm.Criticos</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasCriticos">@vm.Criticos</a></span>
           </div>
         </div>
       </div>
