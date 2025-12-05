@@ -1,4 +1,5 @@
 @page "/kb"
+@using FISEI.ServiceDesk.Web.Services
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 @inject FISEI.ServiceDesk.Web.Services.KnowledgeBaseService KbSvc
@@ -74,120 +75,500 @@
     private Task Next() => Buscar(result.Page + 1);
 }
 
-<header class="institutional-header">
-  <div class="header-container" style="justify-content:space-between;align-items:center">
-    <div class="logo-container">
-      <div class="uta-logo"><i class="fas fa-book"></i></div>
-      <div class="university-info"><h1>Base de Conocimiento</h1><p>Busca soluciones y guías</p></div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn" @onclick="() => Buscar(1)"><i class="fas fa-sync-alt"></i> Actualizar</button>
-    </div>
-  </div>
-  <nav class="main-navigation">
-    <div class="nav-container">
-      <ul class="nav-menu">
-        <li><a class="active" href="/kb"><i class="fas fa-book"></i> KB</a></li>
-        <li><a href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
-        <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
-      </ul>
-    </div>
-  </nav>
-</header>
+<RoleNav />
 
 <main class="main-content">
   <section class="content-card">
-    <div class="card-header">
-      <h2><i class="fas fa-search"></i> Buscar artículos</h2>
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fas fa-book"></i> Base de Conocimiento</h2>
+        <p class="page-subtitle">Busca soluciones, guías y documentación técnica</p>
+      </div>
+      <button class="btn btn-primary" @onclick="() => Buscar(1)">
+        <i class="fas fa-sync-alt"></i> Actualizar
+      </button>
     </div>
 
-    <div class="form-stack">
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <input class="form-control" placeholder="Título, contenido o etiqueta..." @bind="q" />
-        <InputSelect @bind-Value="servicioId" class="form-control">
-          <option value="">Servicio (todos)</option>
-          @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
-        </InputSelect>
-        <InputSelect @bind-Value="laboratorioId" class="form-control">
-          <option value="">Laboratorio (todos)</option>
-          @foreach (var l in laboratorios) { <option value="@l.Id">@l.Nombre</option> }
-        </InputSelect>
+    @if (loading)
+    {
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p class="text-muted">Cargando artículos...</p>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        @* Si manejas categorías reales, deja este filtro *@
-        <InputSelect @bind-Value="categoriaId" class="form-control" style="min-width:220px">
-          <option value="">Categoría (todas)</option>
-          @foreach (var c in categorias) { <option value="@c.Id">@c.Nombre</option> }
-        </InputSelect>
-        <button class="btn btn-primary" @onclick="() => Buscar(1)"><i class="fas fa-search"></i> Buscar</button>
+    }
+    else if (!string.IsNullOrEmpty(error))
+    {
+      <div class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i> @error
       </div>
-    </div>
-  </section>
-
-  <section class="content-card">
-    @if (loading) { <p class="muted">Cargando...</p> }
-    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
-    else if ((result.Items == null) || result.Items.Count == 0) { <p class="muted">No se encontraron artículos.</p> }
+    }
     else
     {
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
-        @foreach (var a in result.Items)
-        {
-          <article class="card" style="padding:12px;border-left:4px solid #8B0000;display:flex;flex-direction:column;gap:6px">
-            <header style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-              <h3 style="margin:0"><a href="@($"/kb/{a.Id}")">@a.Titulo</a></h3>
-              <span class="muted">@a.FechaCreacion.ToLocalTime()</span>
-            </header>
+      <div class="filters-section">
+        <div class="filters-grid">
+          <div class="form-group">
+            <label class="form-label">
+              <i class="fas fa-search"></i> Buscar
+            </label>
+            <input class="form-control" placeholder="Título, contenido o etiqueta..." @bind="q" />
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">
+              <i class="fas fa-cogs"></i> Servicio
+            </label>
+            <InputSelect @bind-Value="servicioId" class="form-control">
+              <option value="">Todos los servicios</option>
+              @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
+            </InputSelect>
+          </div>
 
-            <div style="display:flex;gap:8px;flex-wrap:wrap" class="muted">
-              <span><i class="fas fa-cog"></i> @(a.ServicioNombre ?? NombreServicio(a.ServicioId))</span>
-              <span><i class="fas fa-building"></i> @(a.LaboratorioNombre ?? NombreLab(a.LaboratorioId))</span>
-              <span><i class="fas fa-user"></i> @(a.AutorNombre ?? $"#{a.AutorId}")</span>
-            </div>
+          <div class="form-group">
+            <label class="form-label">
+              <i class="fas fa-building"></i> Laboratorio
+            </label>
+            <InputSelect @bind-Value="laboratorioId" class="form-control">
+              <option value="">Todos los laboratorios</option>
+              @foreach (var l in laboratorios) { <option value="@l.Id">@l.Nombre</option> }
+            </InputSelect>
+          </div>
 
-            @if (!string.IsNullOrWhiteSpace(a.Extracto))
-            {
-              <p style="margin:.25rem 0">@a.Extracto</p>
-            }
+          <div class="form-group">
+            <label class="form-label">
+              <i class="fas fa-tag"></i> Categoría
+            </label>
+            <InputSelect @bind-Value="categoriaId" class="form-control">
+              <option value="">Todas las categorías</option>
+              @foreach (var c in categorias) { <option value="@c.Id">@c.Nombre</option> }
+            </InputSelect>
+          </div>
+        </div>
+        
+        <div class="filters-actions">
+          <button class="btn btn-primary" @onclick="() => Buscar(1)">
+            <i class="fas fa-search"></i> Buscar
+          </button>
+        </div>
+      </div>
 
-            @if (!string.IsNullOrWhiteSpace(a.Etiquetas))
-            {
-              <div style="display:flex;gap:6px;flex-wrap:wrap;margin:.25rem 0">
-                @foreach (var tag in SplitTags(a.Etiquetas))
-                {
-                  <span style="background:#eee;border-radius:999px;padding:2px 8px;font-size:.85rem">#@tag</span>
-                }
+      @if ((result.Items == null) || result.Items.Count == 0)
+      {
+        <div class="empty-state">
+          <i class="fas fa-book-open"></i>
+          <h3>No se encontraron artículos</h3>
+          <p>Intenta ajustar los filtros de búsqueda</p>
+        </div>
+      }
+      else
+      {
+        <div class="articles-grid">
+          @foreach (var a in result.Items)
+          {
+            <article class="article-card">
+              <div class="article-header">
+                <h3 class="article-title">@a.Titulo</h3>
+                <span class="article-date">
+                  <i class="fas fa-calendar-alt"></i>
+                  @a.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy")
+                </span>
               </div>
-            }
 
-            @if (!string.IsNullOrWhiteSpace(a.Referencias))
-            {
-              <div class="muted" style="margin:.25rem 0">
-                Referencias:
-                @foreach (var r in SplitRefs(a.Referencias))
-                {
-                  var url = r.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? r : $"https://{r}";
-                  <a href="@url" target="_blank" style="margin-right:8px">@r</a>
-                }
+              <div class="article-meta">
+                <span class="badge badge-category">
+                  <i class="fas fa-cogs"></i> @(a.ServicioNombre ?? NombreServicio(a.ServicioId))
+                </span>
+                <span class="badge badge-info">
+                  <i class="fas fa-building"></i> @(a.LaboratorioNombre ?? NombreLab(a.LaboratorioId))
+                </span>
+                <span class="badge badge-secondary">
+                  <i class="fas fa-user"></i> @(a.AutorNombre ?? $"#{a.AutorId}")
+                </span>
               </div>
-            }
 
-            <footer style="display:flex;gap:8px;align-items:center;margin-top:6px">
-              <a class="btn btn-primary" href="@($"/kb/{a.Id}")"><i class="fas fa-book-open"></i> Abrir</a>
-              @if (a.IncidenciaOrigenId.HasValue)
+              @if (!string.IsNullOrWhiteSpace(a.Extracto))
               {
-                <a class="btn" href="@($"/incidencia/{a.IncidenciaOrigenId.Value}")"><i class="fas fa-ticket-alt"></i> Ver incidencia</a>
+                <p class="article-excerpt">@a.Extracto</p>
               }
-            </footer>
-          </article>
-        }
-      </div>
 
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
-        <button class="btn" disabled="@(result.Page<=1)" @onclick="Prev"><i class="fas fa-chevron-left"></i> Anterior</button>
-        <span>Página @result.Page de @TotalPages</span>
-        <button class="btn" disabled="@(!CanNext)" @onclick="Next">Siguiente <i class="fas fa-chevron-right"></i></button>
-      </div>
+              @if (!string.IsNullOrWhiteSpace(a.Etiquetas))
+              {
+                <div class="article-tags">
+                  @foreach (var tag in SplitTags(a.Etiquetas))
+                  {
+                    <span class="tag">#@tag</span>
+                  }
+                </div>
+              }
+
+              @if (!string.IsNullOrWhiteSpace(a.Referencias))
+              {
+                <div class="article-references">
+                  <span class="references-label">
+                    <i class="fas fa-link"></i> Referencias:
+                  </span>
+                  @foreach (var r in SplitRefs(a.Referencias))
+                  {
+                    var url = r.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? r : $"https://{r}";
+                    <a href="@url" target="_blank" class="reference-link">@r</a>
+                  }
+                </div>
+              }
+
+              <div class="article-actions">
+                <a class="btn btn-primary" href="@($"/kb/{a.Id}")">
+                  <i class="fas fa-book-open"></i> Ver artículo
+                </a>
+                @if (a.IncidenciaOrigenId.HasValue)
+                {
+                  <a class="btn btn-secondary" href="@($"/incidencia/{a.IncidenciaOrigenId.Value}")">
+                    <i class="fas fa-ticket-alt"></i> Ver incidencia
+                  </a>
+                }
+              </div>
+            </article>
+          }
+        </div>
+
+        <div class="pagination">
+          <button class="btn" disabled="@(result.Page<=1)" @onclick="Prev">
+            <i class="fas fa-chevron-left"></i> Anterior
+          </button>
+          <span class="pagination-info">
+            Página <strong>@result.Page</strong> de <strong>@TotalPages</strong>
+          </span>
+          <button class="btn" disabled="@(!CanNext)" @onclick="Next">
+            Siguiente <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      }
     }
   </section>
 </main>
+
+<style>
+  /* Page Header */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .page-title i {
+    color: #8B0000;
+  }
+  .page-subtitle {
+    color: #6c757d;
+    margin: 0.5rem 0 0 0;
+    font-size: 0.95rem;
+  }
+
+  /* Filters Section */
+  .filters-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .form-label i {
+    color: #8B0000;
+  }
+  .form-control {
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: #8B0000;
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
+  }
+  .filters-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  /* Articles Grid */
+  .articles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .article-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-left: 4px solid #8B0000;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    transition: all 0.3s;
+  }
+  .article-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(139, 0, 0, 0.15);
+  }
+  .article-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .article-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    flex: 1;
+    line-height: 1.4;
+  }
+  .article-date {
+    font-size: 0.85rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+  .article-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .article-excerpt {
+    color: #495057;
+    line-height: 1.6;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .article-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .tag {
+    background: #e9ecef;
+    color: #495057;
+    border-radius: 20px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .article-references {
+    font-size: 0.9rem;
+    color: #6c757d;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .references-label {
+    font-weight: 600;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .reference-link {
+    color: #8B0000;
+    text-decoration: none;
+    transition: color 0.2s;
+    margin-right: 0.75rem;
+  }
+  .reference-link:hover {
+    color: #5c0000;
+    text-decoration: underline;
+  }
+  .article-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: auto;
+  }
+
+  /* Badges */
+  .badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .badge-category {
+    background: #fee2e2;
+    color: #8B0000;
+  }
+  .badge-info {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
+  .badge-secondary {
+    background: #e9ecef;
+    color: #495057;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 0.65rem 1.25rem;
+    border-radius: 8px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 0, 0, 0.4);
+  }
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: #5a6268;
+    transform: translateY(-2px);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem 0;
+  }
+  .pagination-info {
+    color: #495057;
+    font-size: 0.95rem;
+  }
+  .pagination-info strong {
+    color: #8B0000;
+    font-weight: 600;
+  }
+
+  /* Loading */
+  .loading-container {
+    text-align: center;
+    padding: 3rem;
+  }
+  .spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8B0000;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+  .empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+  }
+  .empty-state h3 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+  .empty-state p {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Alert */
+  .alert {
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #c62828;
+  }
+
+  /* Utilities */
+  .text-muted {
+    color: #6c757d;
+  }
+
+  /* Responsive */
+  @@media (max-width: 768px) {
+    .page-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+    .articles-grid {
+      grid-template-columns: 1fr;
+    }
+    .article-header {
+      flex-direction: column;
+    }
+    .pagination {
+      flex-wrap: wrap;
+    }
+  }
+</style>
