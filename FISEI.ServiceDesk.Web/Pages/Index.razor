@@ -14,14 +14,80 @@
     private Dictionary<int,string> mapServicios = new();
     private Dictionary<int,string> mapPrioridades = new();
     private Dictionary<int,string> mapEstados = new();
+    private List<EstadoDto> estados = new();
+    private List<PrioridadDto> prioridades = new();
+    private List<IncidenciaResumenDto> incidencias = new();
+    
+    // Estado modal detalle
+    private bool mostrarDetalle = false;
+    private int incidenciaDetalleId = 0;
+    private IncidenciaDetalleDto? incDetalle;
+    private string nuevoComentario = "";
+
+    private bool EsRol(string r)
+      => string.Equals(Auth.CurrentUserRole, r, StringComparison.OrdinalIgnoreCase);
+    private bool EsAdmin
+      => EsRol("ADMINISTRADOR") || EsRol("ADMIN") || EsRol("Administrador") || EsRol("Admin");
+    private bool EsTecnico
+      => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
+    private bool EsEstudianteODocente
+      => EsRol("ESTUDIANTE") || EsRol("DOCENTE") || EsRol("Estudiante") || EsRol("Docente");
 
     protected override async Task OnInitializedAsync()
     {
       
       try {
         if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
-        vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value);
         await CargarCatalogosYResolverNombres();
+
+        // Cargar incidencias según rol
+        if (EsAdmin || EsTecnico)
+        {
+          incidencias = await IncSvc.ListarTodasAsync(null, null, null, page: 1, pageSize: 500);
+        }
+        else
+        {
+          incidencias = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, null, null, null);
+        }
+
+        // Calcular dashboard desde incidencias + catálogo de estados
+        vm = new DashboardVmDto();
+        vm.Activos = incidencias.Count;
+        vm.Recientes = incidencias.OrderByDescending(i => i.FechaCreacion).Take(5).ToList();
+        // Completar nombres visibles para recientes con catálogos cargados
+        foreach (var i in vm.Recientes)
+        {
+          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
+          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
+          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
+        }
+
+        Func<int, bool> esProgreso = (eid) =>
+        {
+          var e = estados.FirstOrDefault(x => x.Id == eid);
+          var codigo = e?.Codigo ?? string.Empty;
+          var nombre = e?.Nombre ?? string.Empty;
+          return (!string.IsNullOrWhiteSpace(codigo) && (codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase) || codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
+                 || (!string.IsNullOrWhiteSpace(nombre) && (nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase) || nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase)));
+        };
+        Func<int, bool> esResuelto = (eid) =>
+        {
+          var e = estados.FirstOrDefault(x => x.Id == eid);
+          var codigo = e?.Codigo ?? string.Empty;
+          var nombre = e?.Nombre ?? string.Empty;
+          return string.Equals(codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+                 || (!string.IsNullOrWhiteSpace(nombre) && nombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase));
+        };
+
+        vm.EnProgreso = incidencias.Count(i => esProgreso(i.EstadoId));
+        vm.ResueltosMes = incidencias.Count(i => esResuelto(i.EstadoId) && i.FechaCreacion >= DateTime.UtcNow.AddDays(-30));
+
+        vm.Criticos = incidencias.Count(i =>
+        {
+          var pn = i.PrioridadNombre ?? mapPrioridades.GetValueOrDefault(i.PrioridadId);
+          var norm = (pn ?? string.Empty).ToUpperInvariant();
+          return norm.Contains("CRIT");
+        });
       }
       catch (Exception ex) { error = ex.Message; }
       finally { loading = false; }
@@ -35,18 +101,40 @@
         var t2 = PriSvc.ListarAsync();
         var t3 = EstSvc.ListarAsync();
         await Task.WhenAll(t1, t2, t3);
-        mapServicios = t1.Result.ToDictionary(x => x.Id, x => x.Nombre);
-        mapPrioridades = t2.Result.ToDictionary(x => x.Id, x => x.Nombre);
-        mapEstados = t3.Result.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
-
-        foreach (var i in vm.Recientes)
-        {
-          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
-          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
-          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
-        }
+        var serviciosList = t1.Result;
+        prioridades = t2.Result;
+        estados = t3.Result;
+        mapServicios = serviciosList.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+        mapPrioridades = prioridades.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+        mapEstados = estados.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+        // Resolveremos nombres para 'vm.Recientes' cuando se calcule luego de cargar incidencias
       }
       catch { /* silencioso: mostramos IDs si falta */ }
+    }
+
+    private void IrIncidencias() => Nav.NavigateTo("/incidencias");
+    private void IrIncidenciasEnProgreso()
+    {
+      var e = estados.FirstOrDefault(x =>
+        (!string.IsNullOrWhiteSpace(x.Codigo) &&
+          (string.Equals(x.Codigo, "EN_PROGRESO", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(x.Codigo, "EN_PROCESO", StringComparison.OrdinalIgnoreCase)
+           || x.Codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase)
+           || x.Codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
+        || (!string.IsNullOrWhiteSpace(x.Nombre) && (x.Nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase) || x.Nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase))));
+      if (e is not null) Nav.NavigateTo($"/incidencias?estadoId={e.Id}"); else IrIncidencias();
+    }
+    private void IrIncidenciasResueltos()
+    {
+      var e = estados.FirstOrDefault(x => string.Equals(x.Codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+                                       || (!string.IsNullOrWhiteSpace(x.Nombre) && x.Nombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase)));
+      if (e is not null) Nav.NavigateTo($"/incidencias?estadoId={e.Id}"); else IrIncidencias();
+    }
+    private static string QNorm(string s) => s.ToUpperInvariant().Replace("Í","I").Replace("Á","A").Replace("É","E").Replace("Ó","O").Replace("Ú","U");
+    private void IrIncidenciasCriticos()
+    {
+      var p = prioridades.FirstOrDefault(x => QNorm(x.Nombre).Contains("CRIT"));
+      if (p is not null) Nav.NavigateTo($"/incidencias?prioridadId={p.Id}"); else IrIncidencias();
     }
 
     private void LogoutAndNavigate()
@@ -54,75 +142,796 @@
         Auth.Logout();
         Nav.NavigateTo("/login", true);
     }
+
+    private async Task AbrirDetalle(int id)
+    {
+      try
+      {
+        incidenciaDetalleId = id;
+        incDetalle = await IncSvc.ObtenerDetalleAsync(id);
+        mostrarDetalle = true;
+      }
+      catch (Exception ex) { error = ex.Message; }
+    }
+
+    private void CerrarDetalle()
+    {
+      mostrarDetalle = false;
+      incDetalle = null;
+      nuevoComentario = "";
+    }
+
+    private async Task EnviarComentario()
+    {
+      if (string.IsNullOrWhiteSpace(nuevoComentario)) return;
+      try
+      {
+        await IncSvc.AgregarComentarioAsync(incidenciaDetalleId, new ComentarioCrearDto
+        {
+          Texto = nuevoComentario,
+          EsInterno = false
+        });
+        nuevoComentario = "";
+        await AbrirDetalle(incidenciaDetalleId);
+      }
+      catch (Exception ex) { error = ex.Message; }
+    }
 }
 
-<header class="institutional-header">
-  <div class="header-container">
-    <div class="logo-container">
-      <div class="uta-logo"><i class="fas fa-university"></i></div>
-      <div class="university-info">
-        <h1>Universidad Técnica de Ambato</h1>
-        <p>Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
-      </div>
-    </div>
-      <button class="btn btn-ghost" @onclick="LogoutAndNavigate">
-        <i class="fas fa-sign-out-alt"></i>
-      </button>
-    </div>
- 
-</header>
-
-<nav class="main-navigation">
-  <div class="nav-container">
-    <ul class="nav-menu">
-      <li><a class="active" href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
-      <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
-      <li><a href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
-      <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
-      <li><a href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
-    </ul>
-  </div>
-</nav>
+<RoleNav />
 
 <main class="main-content">
-  <section class="dashboard-overview">
-    <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Panel de Control - FIESI</h2>
+  <section class="content-card">
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fas fa-tachometer-alt"></i> Panel de Control</h2>
+        <p class="page-subtitle">Bienvenido al sistema de gestión de incidencias - FISEI</p>
+      </div>
+    </div>
 
-    @if (loading) { <p class="muted">Cargando...</p> }
-    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    @if (loading)
+    {
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p class="muted">Cargando datos del dashboard...</p>
+      </div>
+    }
+    else if (!string.IsNullOrEmpty(error))
+    {
+      <div class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i> @error
+      </div>
+    }
     else
     {
       <div class="stats-grid">
-        <div class="stat-card stat-primary"><div class="stat-icon"><i class="fas fa-ticket-alt"></i></div><div class="stat-content"><h3>Activos</h3><span class="stat-number">@vm.Activos</span></div></div>
-        <div class="stat-card stat-warning"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-content"><h3>En Progreso</h3><span class="stat-number">@vm.EnProgreso</span></div></div>
-        <div class="stat-card stat-success"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-content"><h3>Resueltos (mes)</h3><span class="stat-number">@vm.ResueltosMes</span></div></div>
-        <div class="stat-card stat-danger"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><h3>Críticos</h3><span class="stat-number">@vm.Criticos</span></div></div>
+        <div class="stat-card stat-activos" style="cursor:pointer" @onclick="IrIncidencias">
+          <div class="stat-icon">
+            <i class="fas fa-ticket-alt"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Activas</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidencias">@vm.Activos</a></span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-progreso" style="cursor:pointer" @onclick="IrIncidenciasEnProgreso">
+          <div class="stat-icon">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">En Progreso</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasEnProgreso">@vm.EnProgreso</a></span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-resueltos" style="cursor:pointer" @onclick="IrIncidenciasResueltos">
+          <div class="stat-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Resueltos (mes)</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasResueltos">@vm.ResueltosMes</a></span>
+          </div>
+        </div>
+
+        <div class="stat-card stat-criticos" style="cursor:pointer" @onclick="IrIncidenciasCriticos">
+          <div class="stat-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Críticos</span>
+            <span class="stat-value"><a href="/incidencias" style="text-decoration:none;color:inherit" @onclick:preventDefault @onclick="IrIncidenciasCriticos">@vm.Criticos</a></span>
+          </div>
+        </div>
       </div>
 
-      <section class="content-card">
-        <div class="card-header">
-          <h2><i class="fas fa-list-alt"></i> Recientes</h2>
-          <a class="btn" href="/incidencias"><i class="fas fa-arrow-right"></i> Ver todo</a>
+      <div class="recent-header">
+        <h3><i class="fas fa-history"></i> Incidencias Recientes</h3>
+        <a class="btn btn-primary" href="/incidencias">
+          <i class="fas fa-arrow-right"></i> Ver todas
+        </a>
+      </div>
+
+      @if (vm.Recientes.Count == 0)
+      {
+        <div class="empty-state">
+          <i class="fas fa-inbox"></i>
+          <h3>No hay incidencias recientes</h3>
+          <p>No se han registrado incidencias recientemente</p>
         </div>
+      }
+      else
+      {
         <div class="table-container">
-          <table class="data-table">
-            <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Prioridad</th><th>Estado</th></tr></thead>
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Servicio</th>
+                <th>Título</th>
+                <th>Prioridad</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+              </tr>
+            </thead>
             <tbody>
               @foreach (var t in vm.Recientes)
               {
                 <tr>
-                  <td><a href=@($"/incidencia/{t.Id}")>@t.Id</a></td>
-                  <td>@t.FechaCreacion.ToLocalTime()</td>
-                  <td>@t.ServicioNombre</td>
-                  <td>@t.Titulo</td>
-                  <td>@t.PrioridadNombre</td>
-                  <td>@t.EstadoNombre</td>
+                  <td><span class="badge badge-id">@t.Id</span></td>
+                  <td class="text-muted">@t.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                  <td>
+                    <span class="badge badge-category">
+                      <i class="fas fa-wrench"></i> @t.ServicioNombre
+                    </span>
+                  </td>
+                  <td class="fw-medium">@t.Titulo</td>
+                  <td>
+                    @{
+                      var prioNombre = t.PrioridadNombre?.ToLower() ?? "";
+                      var prioBadgeClass = prioNombre.Contains("alta") || prioNombre.Contains("crítica") ? "badge-danger" 
+                                         : prioNombre.Contains("media") ? "badge-warning" 
+                                         : "badge-success";
+                    }
+                    <span class="badge @prioBadgeClass">
+                      <i class="fas fa-exclamation-circle"></i> @t.PrioridadNombre
+                    </span>
+                  </td>
+                  <td>
+                    @{
+                      var estadoNombre = t.EstadoNombre?.ToLower() ?? "";
+                      var estadoBadgeClass = estadoNombre.Contains("resuelto") || estadoNombre.Contains("cerrado") ? "badge-success"
+                                           : estadoNombre.Contains("progreso") || estadoNombre.Contains("asignado") ? "badge-warning"
+                                           : "badge-info";
+                    }
+                    <span class="badge @estadoBadgeClass">
+                      <i class="fas fa-info-circle"></i> @t.EstadoNombre
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    <div class="action-buttons">
+                      <a href="/incidencias" class="btn-icon btn-view" title="Ver detalles">
+                        <i class="fas fa-eye"></i>
+                      </a>
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
-      </section>
+      }
     }
   </section>
 </main>
+
+@if (mostrarDetalle && incDetalle != null)
+{
+  <div class="modal-overlay" @onclick="CerrarDetalle">
+    <div class="modal modal-xl" @onclick:stopPropagation="true">
+      <div class="modal-header">
+        <h3><i class="fas fa-ticket-alt"></i> Detalle de Incidencia #@incDetalle.Id</h3>
+        <button type="button" class="btn-close" @onclick="CerrarDetalle">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="detalle-grid">
+          <div class="detalle-section">
+            <h4 class="section-title"><i class="fas fa-info-circle"></i> Información General</h4>
+            <div class="info-group">
+              <div class="info-row">
+                <span class="info-label">Título:</span>
+                <span class="info-value">@incDetalle.Titulo</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Descripción:</span>
+                <span class="info-value">@incDetalle.Descripcion</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Servicio:</span>
+                <span class="info-value">
+                  <span class="badge badge-category">@incDetalle.ServicioNombre</span>
+                </span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Prioridad:</span>
+                <span class="info-value">
+                  @{
+                    var prioNombre = incDetalle.PrioridadNombre?.ToLower() ?? "";
+                    var prioBadgeClass = prioNombre.Contains("alta") || prioNombre.Contains("crítica") ? "badge-danger" 
+                                       : prioNombre.Contains("media") ? "badge-warning" 
+                                       : "badge-success";
+                  }
+                  <span class="badge @prioBadgeClass">@incDetalle.PrioridadNombre</span>
+                </span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Estado:</span>
+                <span class="info-value">
+                  @{
+                    var estadoNombre = incDetalle.EstadoNombre?.ToLower() ?? "";
+                    var estadoBadgeClass = estadoNombre.Contains("resuelto") || estadoNombre.Contains("cerrado") ? "badge-success"
+                                         : estadoNombre.Contains("progreso") || estadoNombre.Contains("asignado") ? "badge-warning"
+                                         : "badge-info";
+                  }
+                  <span class="badge @estadoBadgeClass">@incDetalle.EstadoNombre</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="detalle-section">
+            <h4 class="section-title"><i class="fas fa-comments"></i> Comentarios</h4>
+            <div class="comentarios-container">
+              @if (incDetalle.Comentarios != null && incDetalle.Comentarios.Any())
+              {
+                <div class="comentarios-list">
+                  @foreach (var c in incDetalle.Comentarios)
+                  {
+                    <div class="comentario-item">
+                      <div class="comentario-header">
+                        <span class="comentario-autor">
+                          <i class="fas fa-user-circle"></i> @c.AutorNombre
+                        </span>
+                        <span class="comentario-fecha text-muted">
+                          @c.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                        </span>
+                      </div>
+                      <div class="comentario-texto">@c.Texto</div>
+                    </div>
+                  }
+                </div>
+              }
+              else
+              {
+                <p class="text-muted text-center py-3">No hay comentarios aún</p>
+              }
+
+              <div class="comentario-form">
+                <textarea 
+                  class="form-control" 
+                  rows="3" 
+                  placeholder="Agregar un comentario..."
+                  @bind="nuevoComentario">
+                </textarea>
+                <button type="button" class="btn btn-primary" @onclick="EnviarComentario">
+                  <i class="fas fa-paper-plane"></i> Enviar Comentario
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+}
+
+<style>
+  /* Page Header */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .page-title i {
+    color: #8B0000;
+  }
+  .page-subtitle {
+    color: #6c757d;
+    margin: 0.25rem 0 0 0;
+    font-size: 0.875rem;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s;
+    border-left: 4px solid transparent;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .stat-activos {
+    border-left-color: #8B0000;
+  }
+  .stat-activos .stat-icon {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+  }
+  .stat-progreso {
+    border-left-color: #f59e0b;
+  }
+  .stat-progreso .stat-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  }
+  .stat-resueltos {
+    border-left-color: #16a34a;
+  }
+  .stat-resueltos .stat-icon {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  }
+  .stat-criticos {
+    border-left-color: #dc2626;
+  }
+  .stat-criticos .stat-icon {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  }
+  .stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+  .stat-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .stat-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+  }
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+  }
+
+  /* Recent Header */
+  .recent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .recent-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .recent-header h3 i {
+    color: #8B0000;
+  }
+
+  /* Table */
+  .table-container {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .table-modern {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .table-modern thead {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+  }
+  .table-modern th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+  }
+  .table-modern td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .table-modern tbody tr {
+    transition: background-color 0.2s;
+  }
+  .table-modern tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+  .text-end { text-align: right; }
+  .text-muted { color: #6c757d; }
+  .fw-medium { font-weight: 500; }
+
+  /* Action Buttons */
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .btn-view {
+    background: #fee2e2;
+    color: #8B0000;
+  }
+  .btn-view:hover {
+    background: #8B0000;
+    color: white;
+    transform: scale(1.1);
+  }
+
+  /* Badges */
+  .badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .badge-id {
+    background: #e9ecef;
+    color: #495057;
+  }
+  .badge-category {
+    background: #fee2e2;
+    color: #8B0000;
+  }
+  .badge-success {
+    background: #d4edda;
+    color: #155724;
+  }
+  .badge-warning {
+    background: #fff3cd;
+    color: #856404;
+  }
+  .badge-danger {
+    background: #f8d7da;
+    color: #721c24;
+  }
+  .badge-info {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 0, 0, 0.4);
+  }
+
+  /* Loading */
+  .loading-container {
+    text-align: center;
+    padding: 3rem;
+  }
+  .spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8B0000;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .muted {
+    color: #6c757d;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+  .empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+  }
+  .empty-state h3 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+  .empty-state p {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Alert */
+  .alert {
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #c62828;
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+  }
+  .modal {
+    background: white;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    animation: slideUp 0.3s ease-out;
+  }
+  .modal-xl {
+    max-width: 1000px;
+  }
+  .modal-header {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-close:hover {
+    background: rgba(255,255,255,0.3);
+    transform: rotate(90deg);
+  }
+  .modal-body {
+    padding: 2rem;
+    overflow-y: auto;
+    flex: 1;
+  }
+  
+  /* Detalle Grid */
+  .detalle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  .detalle-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #8B0000;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .section-title i {
+    color: #8B0000;
+  }
+  .info-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .info-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .info-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-weight: 600;
+  }
+  .info-value {
+    font-size: 1rem;
+    color: #2c3e50;
+  }
+
+  /* Comentarios */
+  .comentarios-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  .comentarios-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .comentario-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    border-left: 3px solid #8B0000;
+  }
+  .comentario-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .comentario-autor {
+    font-weight: 600;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .comentario-autor i {
+    color: #8B0000;
+  }
+  .comentario-fecha {
+    font-size: 0.85rem;
+  }
+  .comentario-texto {
+    color: #495057;
+    line-height: 1.6;
+  }
+  .comentario-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+  }
+  .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: #8B0000;
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
+  }
+  .text-center { text-align: center; }
+  .py-3 { padding-top: 1rem; padding-bottom: 1rem; }
+
+  /* Animations */
+  @@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @@keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @@media (max-width: 768px) {
+    .detalle-grid {
+      grid-template-columns: 1fr;
+    }
+    .modal {
+      width: 95%;
+      max-height: 95vh;
+    }
+  }
+</style>
