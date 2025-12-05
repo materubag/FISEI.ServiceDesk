@@ -10,6 +10,9 @@
 @using System.Linq
 
 @code {
+  [Parameter, SupplyParameterFromQuery(Name = "estadoId")] public int? QEstadoId { get; set; }
+  [Parameter, SupplyParameterFromQuery(Name = "prioridadId")] public int? QPrioridadId { get; set; }
+  [Parameter, SupplyParameterFromQuery(Name = "search")] public string? QText { get; set; }
     private bool loading = true;
     private string? error;
     private List<IncidenciaResumenDto> items = new();
@@ -39,6 +42,13 @@
     private string nuevoComentario = "";
     private bool esInterno = false;
 
+    // Modal Resolver
+    private bool mostrarResolver = false;
+    private int? incidenciaResolverId = null;
+    private string comentarioResolver = "";
+    private bool savingResolver = false;
+    private int selectedEstadoResolverId = 3;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -51,9 +61,14 @@
             await Task.WhenAll(t1, t2, t3, t4);
 
             servicios = t1.Result; prioridades = t2.Result; estados = t3.Result; laboratorios = t4.Result;
-            mapServicios = servicios.ToDictionary(x => x.Id, x => x.Nombre);
-            mapPrioridades = prioridades.ToDictionary(x => x.Id, x => x.Nombre);
+            mapServicios = servicios.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+            mapPrioridades = prioridades.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
             mapEstados = estados.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+
+        // Aplicar filtros provenientes de querystring si existen
+        if (QEstadoId.HasValue) filtroEstadoId = QEstadoId;
+        if (QPrioridadId.HasValue) filtroPrioridadId = QPrioridadId;
+        if (!string.IsNullOrWhiteSpace(QText)) filtroTexto = QText!;
         }
         catch (Exception ex) { error = "Error cargando catálogos: " + ex.Message; }
 
@@ -65,12 +80,28 @@
         loading = true; error = null;
         try
         {
-            items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
+        if (EsAdmin || EsTecnico)
+        {
+          items = await IncSvc.ListarTodasAsync(filtroTexto, filtroEstadoId, filtroPrioridadId);
+        }
+        else
+        {
+          items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
+        }
             await ResolverNombresFaltantes();
         }
         catch (Exception ex) { error = ex.Message; }
         finally { loading = false; }
     }
+
+    private bool EsRol(string r)
+      => string.Equals(Auth.CurrentUserRole, r, StringComparison.OrdinalIgnoreCase);
+    private bool EsAdmin
+      => EsRol("ADMINISTRADOR") || EsRol("ADMIN") || EsRol("Administrador") || EsRol("Admin");
+    private bool EsTecnico
+      => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
+    private bool EsEstudianteODocente
+      => EsRol("ESTUDIANTE") || EsRol("DOCENTE") || EsRol("Estudiante") || EsRol("Docente");
 
     private async Task ResolverNombresFaltantes()
     {
@@ -80,8 +111,8 @@
                               .Select(x => x.ServicioId).Distinct().ToList();
         foreach (var id in faltanServ)
         {
-            var dto = await ServSvc.ObtenerAsync(id);
-            if (dto != null) mapServicios[id] = dto.Nombre;
+          var dto = await ServSvc.ObtenerAsync(id);
+          if (dto != null) mapServicios[id] = string.IsNullOrWhiteSpace(dto.Nombre) ? $"#{id}" : dto.Nombre;
         }
 
         // Prioridad
@@ -90,8 +121,8 @@
                              .Select(x => x.PrioridadId).Distinct().ToList();
         foreach (var id in faltanPri)
         {
-            var dto = await PriSvc.ObtenerAsync(id);
-            if (dto != null) mapPrioridades[id] = dto.Nombre;
+          var dto = await PriSvc.ObtenerAsync(id);
+          if (dto != null) mapPrioridades[id] = string.IsNullOrWhiteSpace(dto.Nombre) ? $"#{id}" : dto.Nombre;
         }
 
         // Estado
@@ -126,6 +157,7 @@
     // Modal Nueva Incidencia
     private void AbrirFormularioNueva()
     {
+      if (!EsEstudianteODocente) return;
         modelNueva = new NuevaIncidenciaDto
         {
             CreadorId = Auth.CurrentUserId!.Value,
@@ -170,6 +202,51 @@
                     incDetalle.PrioridadNombre = mapPrioridades[incDetalle.PrioridadId];
                 if (string.IsNullOrWhiteSpace(incDetalle.EstadoNombre) && mapEstados.ContainsKey(incDetalle.EstadoId))
                     incDetalle.EstadoNombre = mapEstados[incDetalle.EstadoId];
+
+          // Auto-cambiar a "EN_PROGRESO/EN_PROCESO" solo para Admin/Técnico y si el estado actual NO es final
+          var estadoActual = estados.FirstOrDefault(e => e.Id == incDetalle.EstadoId);
+          var esFinalActual = estadoActual?.EsFinal == true
+                    || string.Equals(estadoActual?.Codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(estadoActual?.Codigo, "CERRADO", StringComparison.OrdinalIgnoreCase);
+
+          if ((EsAdmin || EsTecnico) && !esFinalActual)
+          {
+            var estadoEnProceso = estados.FirstOrDefault(e =>
+              (!string.IsNullOrWhiteSpace(e.Codigo) && (
+                string.Equals(e.Codigo, "EN_PROGRESO", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(e.Codigo, "EN_PROCESO", StringComparison.OrdinalIgnoreCase)
+                || e.Codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase)
+                || e.Codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
+              || (!string.IsNullOrWhiteSpace(e.Nombre) && (
+                e.Nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase)
+                || e.Nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase)))
+            );
+
+            if (estadoEnProceso != null && incDetalle.EstadoId != estadoEnProceso.Id)
+            {
+              try
+              {
+                await IncSvc.CambiarEstadoAsync(id, estadoEnProceso.Id, Auth.CurrentUserId!.Value, "Marcado como En proceso al ver detalle");
+                // Refrescar detalle y listado para reflejar el nuevo estado
+                incDetalle = await IncSvc.ObtenerDetalleAsync(id);
+                if (incDetalle != null)
+                {
+                  if (string.IsNullOrWhiteSpace(incDetalle.ServicioNombre) && mapServicios.ContainsKey(incDetalle.ServicioId))
+                    incDetalle.ServicioNombre = mapServicios[incDetalle.ServicioId];
+                  if (string.IsNullOrWhiteSpace(incDetalle.PrioridadNombre) && mapPrioridades.ContainsKey(incDetalle.PrioridadId))
+                    incDetalle.PrioridadNombre = mapPrioridades[incDetalle.PrioridadId];
+                  if (string.IsNullOrWhiteSpace(incDetalle.EstadoNombre) && mapEstados.ContainsKey(incDetalle.EstadoId))
+                    incDetalle.EstadoNombre = mapEstados[incDetalle.EstadoId];
+                }
+                await Cargar();
+              }
+              catch (Exception exAuto)
+              {
+                // No bloquear el detalle si falla el cambio automático
+                error = error is null ? exAuto.Message : error;
+              }
+            }
+          }
             }
         }
         catch (Exception ex) { error = ex.Message; }
@@ -196,19 +273,47 @@
         }
         catch (Exception ex) { error = ex.Message; }
     }
+
+    private void AbrirResolver(int id)
+    {
+      incidenciaResolverId = id;
+      comentarioResolver = "Se resolvió";
+      selectedEstadoResolverId = items.FirstOrDefault(x => x.Id == id)?.EstadoId ?? 3;
+      mostrarResolver = true;
+    }
+
+    private void CerrarResolver()
+    {
+      mostrarResolver = false;
+      incidenciaResolverId = null;
+      comentarioResolver = "";
+      savingResolver = false;
+    }
+
+    private async Task ConfirmarResolver()
+    {
+      if (incidenciaResolverId == null) return;
+      savingResolver = true;
+      try
+      {
+        var comentario = string.IsNullOrWhiteSpace(comentarioResolver) ? "Se resolvió" : comentarioResolver.Trim();
+        await IncSvc.CambiarEstadoAsync(incidenciaResolverId.Value, selectedEstadoResolverId, Auth.CurrentUserId!.Value, comentario);
+        CerrarResolver();
+        await Cargar();
+        if (mostrarDetalle && incidenciaDetalleId.HasValue && incidenciaDetalleId.Value == incidenciaResolverId.Value)
+        {
+          await AbrirDetalle(incidenciaResolverId.Value);
+        }
+      }
+      catch (Exception ex)
+      {
+        error = ex.Message;
+      }
+      finally { savingResolver = false; }
+    }
 }
 
-<nav class="main-navigation">
-  <div class="nav-container">
-    <ul class="nav-menu">
-      <li><a href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
-      <li><a class="active" href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
-      <li><a  href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
-      <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
-      <li><a href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
-    </ul>
-  </div>
-</nav>
+<RoleNav />
 <main class="main-content">
   <section class="content-card">
     <div class="page-header">
@@ -216,7 +321,7 @@
         <h2 class="page-title"><i class="fas fa-list-alt"></i> Incidencias</h2>
         <p class="page-subtitle">Gestiona las incidencias del sistema</p>
       </div>
-      @if (!loading)
+      @if (!loading && EsEstudianteODocente)
       {
         <button class="btn btn-primary btn-new" @onclick="AbrirFormularioNueva">
           <i class="fas fa-plus"></i> Nueva incidencia
@@ -243,7 +348,8 @@
             <option value="">Todos los estados</option>
             @foreach (var e in estados)
             {
-              <option value="@e.Id">@e.Nombre</option>
+              var nombreEstado = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : (e.Codigo ?? $"#{e.Id}");
+              <option value="@e.Id">@nombreEstado</option>
             }
           </InputSelect>
         </div>
@@ -253,7 +359,8 @@
             <option value="">Todas las prioridades</option>
             @foreach (var p in prioridades)
             {
-              <option value="@p.Id">@p.Nombre</option>
+              var pn = string.IsNullOrWhiteSpace(p.Nombre) ? $"#{p.Id}" : p.Nombre;
+              <option value="@p.Id">@pn</option>
             }
           </InputSelect>
         </div>
@@ -343,6 +450,12 @@
                     <button class="btn-icon btn-view" @onclick="() => AbrirDetalle(t.Id)" title="Ver detalles">
                       <i class="fas fa-eye"></i>
                     </button>
+                    @if (EsAdmin || EsTecnico)
+                    {
+                      <button class="btn-icon btn-view" @onclick="() => AbrirResolver(t.Id)" title="Resolver">
+                        <i class="fas fa-check"></i>
+                      </button>
+                    }
                   </div>
                 </td>
               </tr>
@@ -369,7 +482,7 @@
               <div class="form-group">
                 <label class="form-label"><i class="fas fa-wrench"></i> Servicio</label>
                 <InputSelect @bind-Value="modelNueva.ServicioId" class="form-control">
-                  @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
+                  @foreach (var s in servicios) { var sn = string.IsNullOrWhiteSpace(s.Nombre) ? $"#{s.Id}" : s.Nombre; <option value="@s.Id">@sn</option> }
                 </InputSelect>
               </div>
               <div class="form-group">
@@ -396,7 +509,8 @@
                 <option value="">Sin laboratorio específico</option>
                 @foreach (var l in laboratorios)
                 {
-                  <option value="@l.Id">@l.Nombre</option>
+                  var ln = string.IsNullOrWhiteSpace(l.Nombre) ? $"#{l.Id}" : l.Nombre;
+                  <option value="@l.Id">@ln</option>
                 }
               </InputSelect>
             </div>
@@ -514,22 +628,51 @@
                     <p class="muted">No hay comentarios aún</p>
                   }
 
-                  <div class="comentario-form">
-                    <h5>Agregar Comentario</h5>
-                    <textarea class="form-control" rows="3" @bind="nuevoComentario" placeholder="Escribe tu comentario..."></textarea>
-                    <div class="comentario-actions">
-                      <div class="custom-checkbox">
-                        <InputCheckbox id="chkInterno" @bind-Value="esInterno" />
-                        <label for="chkInterno"><i class="fas fa-lock"></i> Comentario interno</label>
-                      </div>
-                      <button class="btn btn-primary" @onclick="EnviarComentario" disabled="@string.IsNullOrWhiteSpace(nuevoComentario)">
-                        <i class="fas fa-paper-plane"></i> Enviar
-                      </button>
-                    </div>
-                  </div>
+                  @* Formulario para agregar comentario removido por solicitud *@
                 </div>
               </div>
             }
+          </div>
+        </div>
+      </div>
+    }
+
+    @* Modal Resolver Incidencia *@
+    @if (mostrarResolver && incidenciaResolverId != null && (EsAdmin || EsTecnico))
+    {
+      <div class="modal-overlay" @onclick="CerrarResolver">
+        <div class="modal modal-large" @onclick:stopPropagation="true">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="fas fa-check-circle"></i> Resolver incidencia #@incidenciaResolverId
+            </h5>
+            <button class="btn-close" @onclick="CerrarResolver" title="Cerrar">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label"><i class="fas fa-flag"></i> Estado</label>
+                <InputSelect @bind-Value="selectedEstadoResolverId" class="form-control">
+                  @foreach (var e in estados)
+                  {
+                    var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : (e.Codigo ?? $"#{e.Id}");
+                    <option value="@e.Id">@nombre</option>
+                  }
+                </InputSelect>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-comment-dots"></i> Comentario de resolución</label>
+              <textarea class="form-control" rows="4" @bind="comentarioResolver" placeholder="Describe brevemente la solución..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-success" disabled="@savingResolver" @onclick="ConfirmarResolver">
+              <i class="fas fa-check"></i> @(savingResolver ? "Resolviendo..." : "Resolver")
+            </button>
+            <button class="btn btn-secondary" @onclick="CerrarResolver">
+              <i class="fas fa-times"></i> Cancelar
+            </button>
           </div>
         </div>
       </div>
