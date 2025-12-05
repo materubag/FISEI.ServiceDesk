@@ -32,7 +32,17 @@ public class IncidenciasController : ControllerBase
         var estadoReportadoId = await _db.EstadosIncidencia
             .Where(e => e.Codigo == "REPORTADO")
             .Select(e => e.Id)
-            .FirstAsync();
+            .FirstOrDefaultAsync();
+        if (estadoReportadoId == 0)
+        {
+            // Fallback a "ABIERTO" si no existe REPORTADO en catálogo
+            estadoReportadoId = await _db.EstadosIncidencia
+                .Where(e => e.Codigo == "ABIERTO")
+                .Select(e => e.Id)
+                .FirstOrDefaultAsync();
+            if (estadoReportadoId == 0)
+                return BadRequest("No se encontró estado inicial (REPORTADO/ABIERTO) en el catálogo.");
+        }
 
         var entity = new Incidencia
         {

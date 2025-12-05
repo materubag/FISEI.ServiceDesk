@@ -1,55 +1,55 @@
 @page "/"
-@page "/home"
-@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@using FISEI.ServiceDesk.Web.Services
 @inject NavigationManager Nav
-@inject HttpClient Http
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.PrioridadesService PriSvc
+@inject FISEI.ServiceDesk.Web.Services.EstadosService EstSvc
 
 @code {
     private bool loading = true;
     private string? error;
-    private List<TicketRow> tickets = new();
-    private List<Stat> stats = new();
-
-  protected override async Task OnAfterRenderAsync(bool firstRender)
-  {
-    if (firstRender)
-    {
-      // Tras inicializar app y cargar token desde storage, valida y redirige si corresponde
-      if (!Auth.IsAuthenticated)
-      {
-        Nav.NavigateTo("/login", true);
-        return;
-      }
-    }
-  }
+    private DashboardVmDto vm = new();
+    private Dictionary<int,string> mapServicios = new();
+    private Dictionary<int,string> mapPrioridades = new();
+    private Dictionary<int,string> mapEstados = new();
 
     protected override async Task OnInitializedAsync()
     {
-    if (!Auth.IsAuthenticated)
-    {
-      return;
-    }
-        try
-        {
-            // Demo: puedes reemplazar por API real
-            stats = new() {
-                new("Tickets Activos","fa-ticket-alt","stat-primary","128"),
-                new("En Progreso","fa-clock","stat-warning","32"),
-                new("Resueltos (mes)","fa-check-circle","stat-success","64"),
-                new("Críticos","fa-exclamation-triangle","stat-danger","5"),
-            };
-            tickets = new() {
-                new(101,"2025-12-01","Lab Redes","PC estación 12 no enciende","Alta","Abierto"),
-                new(102,"2025-12-01","Lab Software","Error de login en PC 8","Media","En Progreso"),
-            };
-        }
-        catch (Exception ex) { error = ex.Message; }
-        finally { loading = false; }
+      
+      try {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
+        vm = await IncSvc.GetDashboardAsync(Auth.CurrentUserId!.Value);
+        await CargarCatalogosYResolverNombres();
+      }
+      catch (Exception ex) { error = ex.Message; }
+      finally { loading = false; }
     }
 
-    private record Stat(string Title, string Icon, string Class, string Number);
-    private record TicketRow(int Id, string Fecha, string Lab, string Titulo, string Prioridad, string Estado);
-    private void Logout()
+    private async Task CargarCatalogosYResolverNombres()
+    {
+      try
+      {
+        var t1 = ServSvc.ListarAsync();
+        var t2 = PriSvc.ListarAsync();
+        var t3 = EstSvc.ListarAsync();
+        await Task.WhenAll(t1, t2, t3);
+        mapServicios = t1.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapPrioridades = t2.Result.ToDictionary(x => x.Id, x => x.Nombre);
+        mapEstados = t3.Result.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
+
+        foreach (var i in vm.Recientes)
+        {
+          if (string.IsNullOrWhiteSpace(i.ServicioNombre) && mapServicios.TryGetValue(i.ServicioId, out var sn)) i.ServicioNombre = sn;
+          if (string.IsNullOrWhiteSpace(i.PrioridadNombre) && mapPrioridades.TryGetValue(i.PrioridadId, out var pn)) i.PrioridadNombre = pn;
+          if (string.IsNullOrWhiteSpace(i.EstadoNombre) && mapEstados.TryGetValue(i.EstadoId, out var en)) i.EstadoNombre = en;
+        }
+      }
+      catch { /* silencioso: mostramos IDs si falta */ }
+    }
+
+    private void LogoutAndNavigate()
     {
         Auth.Logout();
         Nav.NavigateTo("/login", true);
@@ -65,19 +65,11 @@
         <p>Facultad de Ingeniería en Sistemas, Electrónica e Industrial</p>
       </div>
     </div>
-    <div class="user-info">
-      <div class="user-avatar-placeholder">@((Auth.CurrentUserName ?? "U").Substring(0,1))</div>
-      <div class="user-meta">
-        <div>@(Auth.CurrentUserName ?? "Usuario")</div>
-        <div class="muted">@Auth.CurrentUserRole</div>
-      </div>
-     <button class="btn btn-ghost" @onclick="Logout">
-  
-
+      <button class="btn btn-ghost" @onclick="LogoutAndNavigate">
         <i class="fas fa-sign-out-alt"></i>
       </button>
     </div>
-  </div>
+ 
 </header>
 
 <nav class="main-navigation">
@@ -85,46 +77,46 @@
     <ul class="nav-menu">
       <li><a class="active" href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
       <li><a href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
+      <li><a href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
       <li><a href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
+      <li><a href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
     </ul>
   </div>
 </nav>
 
 <main class="main-content">
   <section class="dashboard-overview">
-    <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Panel de Control - Laboratorios FIESI</h2>
+    <h2 class="section-title"><i class="fas fa-tachometer-alt"></i> Panel de Control - FIESI</h2>
 
     @if (loading) { <p class="muted">Cargando...</p> }
     else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
     else
     {
       <div class="stats-grid">
-        @foreach (var s in stats)
-        {
-          <div class="stat-card @s.Class">
-            <div class="stat-icon"><i class="fas @s.Icon"></i></div>
-            <div class="stat-content">
-              <h3>@s.Title</h3>
-              <span class="stat-number">@s.Number</span>
-            </div>
-          </div>
-        }
+        <div class="stat-card stat-primary"><div class="stat-icon"><i class="fas fa-ticket-alt"></i></div><div class="stat-content"><h3>Activos</h3><span class="stat-number">@vm.Activos</span></div></div>
+        <div class="stat-card stat-warning"><div class="stat-icon"><i class="fas fa-clock"></i></div><div class="stat-content"><h3>En Progreso</h3><span class="stat-number">@vm.EnProgreso</span></div></div>
+        <div class="stat-card stat-success"><div class="stat-icon"><i class="fas fa-check-circle"></i></div><div class="stat-content"><h3>Resueltos (mes)</h3><span class="stat-number">@vm.ResueltosMes</span></div></div>
+        <div class="stat-card stat-danger"><div class="stat-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><h3>Críticos</h3><span class="stat-number">@vm.Criticos</span></div></div>
       </div>
 
       <section class="content-card">
         <div class="card-header">
-          <h2><i class="fas fa-list-alt"></i> Tickets Registrados</h2>
+          <h2><i class="fas fa-list-alt"></i> Recientes</h2>
+          <a class="btn" href="/incidencias"><i class="fas fa-arrow-right"></i> Ver todo</a>
         </div>
         <div class="table-container">
           <table class="data-table">
-            <thead>
-              <tr><th>ID</th><th>Fecha</th><th>Laboratorio</th><th>Título</th><th>Prioridad</th><th>Estado</th></tr>
-            </thead>
+            <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Prioridad</th><th>Estado</th></tr></thead>
             <tbody>
-              @foreach (var t in tickets)
+              @foreach (var t in vm.Recientes)
               {
                 <tr>
-                  <td>@t.Id</td><td>@t.Fecha</td><td>@t.Lab</td><td>@t.Titulo</td><td>@t.Prioridad</td><td>@t.Estado</td>
+                  <td><a href=@($"/incidencia/{t.Id}")>@t.Id</a></td>
+                  <td>@t.FechaCreacion.ToLocalTime()</td>
+                  <td>@t.ServicioNombre</td>
+                  <td>@t.Titulo</td>
+                  <td>@t.PrioridadNombre</td>
+                  <td>@t.EstadoNombre</td>
                 </tr>
               }
             </tbody>
