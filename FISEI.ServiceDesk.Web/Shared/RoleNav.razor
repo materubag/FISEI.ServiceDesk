@@ -1,0 +1,41 @@
+@using FISEI.ServiceDesk.Web.Services
+@inject NavigationManager Nav
+@inject AuthClientService Auth
+
+@code {
+  private string Role => (Auth.CurrentUserRole ?? "").Trim();
+  private string RoleNorm => Role.ToUpperInvariant();
+  private bool EsAdmin => RoleNorm == "ADMINISTRADOR";
+  private bool EsTecnico => RoleNorm == "TECNICO";
+  private bool EsEstudiante => RoleNorm == "ESTUDIANTE";
+  private bool EsDocente => RoleNorm == "DOCENTE";
+
+  private string ActiveClass(string path)
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri).TrimEnd('/');
+        path = path.TrimStart('/');
+        var isActive = string.Equals(uri, path, StringComparison.OrdinalIgnoreCase)
+                       || (string.IsNullOrWhiteSpace(uri) && string.IsNullOrWhiteSpace(path));
+        return isActive ? "active" : string.Empty;
+    }
+}
+
+<nav class="main-navigation">
+  <div class="nav-container">
+    <ul class="nav-menu">
+      <li><a class="@ActiveClass("/")" href="/"><i class="fas fa-tachometer-alt"></i> Inicio</a></li>
+      <li><a class="@ActiveClass("/incidencias")" href="/incidencias"><i class="fas fa-list-alt"></i> Incidencias</a></li>
+
+      @if (EsAdmin)
+      {
+        <li><a class="@ActiveClass("/servicios")" href="/servicios"><i class="fas fa-cogs"></i> Servicios</a></li>
+        <li><a class="@ActiveClass("/laboratorios")" href="/laboratorios"><i class="fas fa-building"></i> Laboratorios</a></li>
+      }
+
+      @if (EsAdmin || EsTecnico)
+      {
+        <li><a class="@ActiveClass("/kb")" href="/kb"><i class="fas fa-book"></i> Base de Conocimiento</a></li>
+      }
+    </ul>
+  </div>
+</nav>
