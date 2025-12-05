@@ -2,41 +2,668 @@
 @using FISEI.ServiceDesk.Web.Services
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
-@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
+@inject FISEI.ServiceDesk.Web.Services.ServiciosService ServiciosService
+@inject FISEI.ServiceDesk.Web.Services.CategoriasService CategoriasService
+@using System.ComponentModel.DataAnnotations
 
 @code {
     private bool loading = true;
     private string? error;
-    private List<ServicioDto> items = new();
+    private List<ServicioDto> servicios = new();
+    private List<CategoriaDto> categorias = new();
+  private bool mostrarFormulario = false; // controla modal
+    private bool mostrarConfirmacion = false; // controla modal de confirmación
+    private int? editId = null;
+    private int? deleteId = null;
+  private FormModel formModel = new();
 
     protected override async Task OnInitializedAsync()
     {
         if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", false); return; }
-        try { items = await ServSvc.ListarAsync(); }
+        try {
+          categorias = await CategoriasService.ListarAsync();
+          servicios = await ServiciosService.ListarAsync();
+        }
         catch (Exception ex) { error = ex.Message; }
         finally { loading = false; }
     }
+
+      private void Nuevo()
+      {
+        editId = null;
+        formModel = new FormModel { CategoriaId = 0, Nombre = string.Empty, Activo = true };
+        mostrarFormulario = true;
+      }
+
+      private void Editar(ServicioDto dto)
+      {
+        editId = dto.Id;
+        formModel = new FormModel { CategoriaId = dto.CategoriaId, Nombre = dto.Nombre, Activo = dto.Activo };
+        mostrarFormulario = true;
+      }
+
+      private async Task Guardar()
+      {
+        if (editId is null)
+        {
+          var creado = await ServiciosService.CrearAsync(new ServicioCreateDto
+          {
+            CategoriaId = formModel.CategoriaId,
+            Nombre = formModel.Nombre,
+            Activo = formModel.Activo
+          });
+          if (creado is not null)
+          {
+            servicios = await ServiciosService.ListarAsync();
+            mostrarFormulario = false;
+          }
+        }
+        else
+        {
+          var ok = await ServiciosService.ActualizarAsync(editId.Value, new ServicioUpdateDto
+          {
+            CategoriaId = formModel.CategoriaId,
+            Nombre = formModel.Nombre,
+            Activo = formModel.Activo
+          });
+          if (ok)
+          {
+            servicios = await ServiciosService.ListarAsync();
+            mostrarFormulario = false;
+          }
+        }
+      }
+
+      private void Cancelar() => mostrarFormulario = false;
+
+      private void ConfirmarEliminar(int id)
+      {
+        deleteId = id;
+        mostrarConfirmacion = true;
+      }
+
+      private async Task EliminarConfirmado()
+      {
+        if (deleteId is int id)
+        {
+          var ok = await ServiciosService.EliminarAsync(id);
+          if (ok)
+          {
+            servicios = await ServiciosService.ListarAsync();
+          }
+        }
+        mostrarConfirmacion = false;
+        deleteId = null;
+      }
+
+      private void CancelarEliminar()
+      {
+        mostrarConfirmacion = false;
+        deleteId = null;
+      }
 }
 
-<header class="institutional-header">
-  <div class="header-container">
-    <div class="logo-container"><div class="uta-logo"><i class="fas fa-cogs"></i></div><div class="university-info"><h1>Servicios</h1></div></div>
-  </div>
-</header>
-
+<RoleNav />
 <main class="main-content">
   <section class="content-card">
-    @if (loading) { <p class="muted">Cargando...</p> }
-    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
-    else if (items.Count == 0) { <p class="muted">No hay servicios</p> }
+    <div class="page-header">
+      <div>
+        <h2 class="page-title"><i class="fas fa-cogs"></i> Servicios</h2>
+        <p class="page-subtitle">Gestiona los servicios disponibles del sistema</p>
+      </div>
+      @if (!loading && servicios.Count > 0)
+      {
+        <button class="btn btn-primary btn-new" @onclick="Nuevo">
+          <i class="fas fa-plus"></i> Nuevo servicio
+        </button>
+      }
+    </div>
+
+    @if (loading)
+    {
+      <div class="loading-container">
+        <div class="spinner"></div>
+        <p class="muted">Cargando servicios...</p>
+      </div>
+    }
+    else if (!string.IsNullOrEmpty(error))
+    {
+      <div class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i> @error
+      </div>
+    }
+    else if (servicios.Count == 0)
+    {
+      <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <h3>No hay servicios</h3>
+        <p>Comienza creando tu primer servicio</p>
+        <button class="btn btn-primary" @onclick="Nuevo">
+          <i class="fas fa-plus"></i> Crear servicio
+        </button>
+      </div>
+    }
     else
     {
-      <ul>
-        @foreach (var s in items)
-        {
-          <li><b>@s.Nombre</b> — @s.Descripcion</li>
-        }
-      </ul>
+      <div class="table-container">
+        <table class="table-modern">
+          <thead>
+              <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Categoría</th>
+                  <th>Estado</th>
+                  <th class="text-end">Acciones</th>
+              </tr>
+          </thead>
+          <tbody>
+              @foreach (var s in servicios)
+              {
+                  var categoriaNombre = categorias.FirstOrDefault(c => c.Id == s.CategoriaId)?.Nombre ?? "-";
+                  <tr>
+                      <td><span class="badge badge-id">@s.Id</span></td>
+                      <td class="fw-medium">@s.Nombre</td>
+                      <td>
+                        <span class="badge badge-category">
+                          <i class="fas fa-tag"></i> @categoriaNombre
+                        </span>
+                      </td>
+                      <td>
+                        @if (s.Activo)
+                        {
+                          <span class="badge badge-success">
+                            <i class="fas fa-check-circle"></i> Activo
+                          </span>
+                        }
+                        else
+                        {
+                          <span class="badge badge-inactive">
+                            <i class="fas fa-times-circle"></i> Inactivo
+                          </span>
+                        }
+                      </td>
+                      <td class="text-end">
+                        <div class="action-buttons">
+                          <button class="btn-icon btn-edit" @onclick="() => Editar(s)" title="Editar">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <button class="btn-icon btn-delete" @onclick="() => ConfirmarEliminar(s.Id)" title="Eliminar">
+                            <i class="fas fa-trash-alt"> </i>
+                          </button>
+                        </div>
+                      </td>
+                  </tr>
+              }
+          </tbody>
+        </table>
+      </div>
+
+      @if (mostrarFormulario)
+      {
+        <div class="modal-overlay" @onclick="Cancelar">
+          <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                <i class="fas @(editId is null ? "fa-plus-circle" : "fa-edit")"></i>
+                @(editId is null ? "Nuevo servicio" : "Editar servicio")
+              </h5>
+              <button class="btn-close" @onclick="Cancelar" title="Cerrar">×</button>
+            </div>
+            <div class="modal-body">
+              <EditForm Model="formModel" OnValidSubmit="Guardar">
+                <DataAnnotationsValidator />
+                <div class="form-group">
+                  <label class="form-label"><i class="fas fa-signature"></i> Nombre del servicio</label>
+                  <InputText class="form-control" @bind-Value="formModel.Nombre" placeholder="Ej: Instalación de software" />
+                  <ValidationMessage For="() => formModel.Nombre" class="validation-error" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label"><i class="fas fa-tag"></i> Categoría</label>
+                  <InputSelect class="form-control" @bind-Value="formModel.CategoriaId">
+                    <option value="0">-- Seleccione una categoría --</option>
+                    @foreach (var c in categorias)
+                    {
+                      <option value="@c.Id">@c.Nombre</option>
+                    }
+                  </InputSelect>
+                  <ValidationMessage For="() => formModel.CategoriaId" class="validation-error" />
+                </div>
+                <div class="form-group">
+                  <div class="custom-checkbox">
+                    <InputCheckbox id="chkActivo" @bind-Value="formModel.Activo" />
+                    <label for="chkActivo"><i class="fas fa-check-circle"></i> Servicio activo</label>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="submit" class="btn btn-success">
+                    <i class="fas fa-save"></i> Guardar
+                  </button>
+                  <button type="button" class="btn btn-secondary" @onclick="Cancelar">
+                    <i class="fas fa-times"></i> Cancelar
+                  </button>
+                </div>
+              </EditForm>
+            </div>
+          </div>
+        </div>
+      }
     }
   </section>
 </main>
+
+@code {
+    public class FormModel
+    {
+        [Required(ErrorMessage = "El nombre es obligatorio")]
+        [StringLength(100, ErrorMessage = "Máximo 100 caracteres")]
+        public string Nombre { get; set; } = string.Empty;
+
+        [Range(1, int.MaxValue, ErrorMessage = "Seleccione una categoría válida")]
+        public int CategoriaId { get; set; }
+
+        public bool Activo { get; set; } = true;
+    }
+}
+
+<style>
+  /* Page Header */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .page-subtitle {
+    color: #6c757d;
+    margin: 0.25rem 0 0 0;
+    font-size: 0.95rem;
+  }
+  
+  /* Buttons */
+  .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 0, 0, 0.4);
+  }
+  .btn-success {
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: white;
+  }
+  .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
+  }
+  .btn-danger {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    color: white;
+  }
+  .btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+  }
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+  .btn-secondary:hover {
+    background: #5a6268;
+  }
+
+  /* Table */
+  .table-container {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .table-modern {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .table-modern thead {
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: white;
+  }
+  .table-modern th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+  }
+  .table-modern td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+  .table-modern tbody tr {
+    transition: background-color 0.2s;
+  }
+  .table-modern tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+  .text-end { text-align: right; }
+  .fw-medium { font-weight: 500; }
+
+  /* Badges */
+  .badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .badge-id {
+    background: #e9ecef;
+    color: #495057;
+  }
+  .badge-category {
+    background: #fee2e2;
+    color: #8B0000;
+  }
+  .badge-success {
+    background: #d4edda;
+    color: #155724;
+  }
+  .badge-inactive {
+    background: #f8d7da;
+    color: #721c24;
+  }
+
+  /* Action Buttons */
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-edit {
+    background: #fee2e2;
+    color: #8B0000;
+  }
+  .btn-edit:hover {
+    background: #8B0000;
+    color: white;
+    transform: scale(1.1);
+  }
+  .btn-delete {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+  .btn-delete:hover {
+    background: #dc2626;
+    color: white;
+    transform: scale(1.1);
+  }
+
+  /* Loading */
+  .loading-container {
+    text-align: center;
+    padding: 3rem;
+  }
+  .spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #8B0000;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+  @@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+  .empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+  }
+  .empty-state h3 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+  }
+  .empty-state p {
+    color: #6c757d;
+    margin-bottom: 1.5rem;
+  }
+
+  /* Alert */
+  .alert {
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #c62828;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+    animation: fadeIn 0.2s;
+  }
+  @@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .modal {
+    background: #fff;
+    width: 600px;
+    max-width: 90vw;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s;
+  }
+  @@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .modal-confirm {
+    width: 480px;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    border-radius: 12px 12px 0 0;
+  }
+  .modal-header-danger {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  }
+  .modal-title {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .modal-body {
+    padding: 1.5rem;
+  }
+  .modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-radius: 0 0 12px 12px;
+  }
+  .btn-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: white;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+  .btn-close:hover {
+    opacity: 1;
+  }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  .form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #495057;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.2s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: #8B0000;
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
+  }
+  .custom-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+  }
+  .custom-checkbox input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+  .custom-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #495057;
+  }
+  .validation-error {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+  }
+
+  /* Confirm Modal */
+  .confirm-message {
+    text-align: center;
+    padding: 1rem;
+  }
+  .confirm-icon {
+    font-size: 3.5rem;
+    color: #dc2626;
+    margin-bottom: 1rem;
+  }
+  .confirm-text {
+    font-size: 1.1rem;
+    color: #495057;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+  .confirm-warning {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+</style>
+
+@* Modal de confirmación de borrado *@
+@if (mostrarConfirmacion)
+{
+  <div class="modal-overlay" @onclick="CancelarEliminar">
+    <div class="modal modal-confirm" @onclick:stopPropagation="true">
+      <div class="modal-header modal-header-danger">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle"></i> Confirmación de eliminación
+        </h5>
+        <button class="btn-close" @onclick="CancelarEliminar" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-message">
+          <i class="fas fa-trash-alt confirm-icon"></i>
+          <p class="confirm-text">¿Estás seguro que deseas eliminar este servicio?</p>
+          <p class="confirm-warning">Esta acción no se puede deshacer.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" @onclick="EliminarConfirmado">
+          <i class="fas fa-trash-alt"></i> Sí, eliminar
+        </button>
+        <button class="btn btn-secondary" @onclick="CancelarEliminar">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+}
