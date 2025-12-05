@@ -12,20 +12,20 @@ public class NotificacionesApiService
     public NotificacionesApiService(HttpClient http) => _http = http;
 
     public async Task<List<NotificacionDto>> ListarAsync(int usuarioId)
-        => await _http.GetFromJsonAsync<List<NotificacionDto>>($"/api/notificacionescrud?usuarioId={usuarioId}") ?? new();
+        => await _http.GetFromJsonAsync<List<NotificacionDto>>($"/api/notificaciones?usuarioId={usuarioId}") ?? new();
 
     public async Task<int> ContarNoLeidasAsync(int usuarioId)
-        => await _http.GetFromJsonAsync<int>($"/api/notificacionescrud/unread-count?usuarioId={usuarioId}");
+        => await _http.GetFromJsonAsync<int>($"/api/notificaciones/unread-count?usuarioId={usuarioId}");
 
     public async Task MarcarLeidaAsync(int notificacionId)
     {
-        var resp = await _http.PatchAsync($"/api/notificacionescrud/{notificacionId}/leer", content: null);
+        var resp = await _http.PatchAsync($"/api/notificaciones/{notificacionId}/leer", content: null);
         resp.EnsureSuccessStatusCode();
     }
 
     public async Task MarcarTodasLeidasAsync(int usuarioId)
     {
-        var resp = await _http.PostAsync($"/api/notificacionescrud/leer-todas?usuarioId={usuarioId}", content: null);
+        var resp = await _http.PostAsync($"/api/notificaciones/leer-todas?usuarioId={usuarioId}", content: null);
         resp.EnsureSuccessStatusCode();
     }
 }
@@ -33,10 +33,8 @@ public class NotificacionesApiService
 public class NotificacionDto
 {
     public int Id { get; set; }
-    public int UsuarioDestinoId { get; set; }
-    public string Tipo { get; set; } = "";       // NUEVA_INCIDENCIA | ESTADO_CAMBIADO
-    public string Referencia { get; set; } = ""; // ej. INC-000123
+    public string Titulo { get; set; } = "";
     public string Mensaje { get; set; } = "";
-    public bool Leida { get; set; }
     public DateTime Fecha { get; set; }
+    public bool Leida { get; set; }
 }

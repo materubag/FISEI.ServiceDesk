@@ -94,28 +94,4 @@ public class NotificacionesCrudController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
-
-    // PATCH /api/notificacionescrud/{id}/leer
-    [HttpPatch("{id:int}/leer")]
-    public async Task<IActionResult> MarkRead(int id)
-    {
-        var e = await _db.Notificaciones.FindAsync(id);
-        if (e is null) return NotFound();
-        if (!e.Leida)
-        {
-            e.Leida = true;
-            await _db.SaveChangesAsync();
-        }
-        return NoContent();
-    }
-
-    // POST /api/notificacionescrud/leer-todas?usuarioId=
-    [HttpPost("leer-todas")]
-    public async Task<IActionResult> MarkAllRead([FromQuery] int usuarioId)
-    {
-        var rows = await _db.Notificaciones
-            .Where(n => n.UsuarioDestinoId == usuarioId && !n.Leida)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.Leida, true));
-        return Ok(new { updated = rows });
-    }
 }
