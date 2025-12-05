@@ -59,17 +59,18 @@
         @foreach (var n in items.OrderByDescending(x => x.Fecha))
         {
           <li style="margin-bottom:10px">
-              <div class="flex items-start gap-3 p-3 hover:bg-gray-50 rounded">
-                <div class="mt-1">
-                  <span class="inline-block w-2 h-2 rounded-full @(n.Leida ? "bg-gray-300" : "bg-blue-500")"></span>
-                </div>
-                <div class="flex-1">
-                  <div class="text-sm font-semibold text-gray-900">@n.Tipo</div>
-                  <div class="text-sm text-gray-700">@n.Mensaje</div>
-                  <div class="text-xs text-gray-500">@n.Referencia</div>
-                </div>
-                <div class="text-xs text-gray-500 whitespace-nowrap">@n.Fecha.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</div>
+            <div style="display:flex;justify-content:space-between;gap:8px">
+              <div>
+                <b>@n.Titulo</b> <span class="muted">(@n.Fecha.ToLocalTime())</span>
+                <div>@n.Mensaje</div>
               </div>
+              <div>
+                @if (!n.Leida)
+                {
+                  <button class="btn btn-primary" @onclick='() => MarcarLeida(n.Id)'><i class="fas fa-check"></i> Leída</button>
+                }
+              </div>
+            </div>
           </li>
         }
       </ul>
