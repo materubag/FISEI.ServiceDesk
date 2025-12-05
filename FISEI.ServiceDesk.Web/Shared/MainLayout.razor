@@ -1,35 +1,51 @@
 @inherits LayoutComponentBase
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+@inject FISEI.ServiceDesk.Web.Services.NotificacionesService Notif
+@inject FISEI.ServiceDesk.Web.Services.NotificacionesApiService NotifApi
+@inject IHttpClientFactory HttpFactory
 
 <div class="min-h-screen flex flex-col">
     <header class="px-4 py-2 bg-white border-b border-slate-200">
         <div class="flex items-center justify-between gap-4">
-            
-            <!-- LOGO A LA IZQUIERDA -->
             <div class="flex items-center" style="width: 200px;">
-                <img src="/images/logo.png" alt="Logo" class="object-contain" style="height:70px;width:auto;" />
+                <img src="/Images/logo.png" alt="Logo" class="object-contain" style="height:70px;width:auto;" />
             </div>
 
-            <!-- TÍTULO CENTRADO (POSICIÓN ABSOLUTA) -->
             <div class="absolute left-1/2 transform -translate-x-1/2">
                 <a href="/" class="text-2xl font-semibold" style="color:#9e1b1b;">
                     ServiceDesk
                 </a>
             </div>
 
-            <!-- NAVEGACIÓN A LA DERECHA -->
-            <div class="ml-auto" style="width: 200px;">
+            <div class="ml-auto" style="width: 300px;">
                 <nav class="flex items-center justify-end gap-4 text-sm text-black">
                     @if (Auth.IsAuthenticated)
                     {
-                        
-                                <span class="text-slate-600">
-                                    Usuario: @Auth.CurrentUserName (@Auth.CurrentUserRole)
+                        <!-- Botón de notificaciones con posición relativa inline -->
+                        <button title="Notificaciones" @onclick="ToggleNoti" style="position:relative;background:transparent;border:none;cursor:pointer;padding:0;">
+                            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9999px;background-color:#9e1b1b;color:white;">
+                                <i class="fas fa-bell"></i>
+                            </span>
+                            @if (unreadCount > 0)
+                            {
+                                <!-- Badge azul absoluto con borde blanco y transform -->
+                                <span style="
+                                    position:absolute;top:0;right:0;transform:translate(35%,-35%);
+                                    z-index:50;background:#2563eb;color:#fff;
+                                    display:flex;align-items:center;justify-content:center;
+                                    width:18px;height:18px;border-radius:9999px;
+                                    outline:2px solid #fff;font-size:11px;font-weight:700;line-height:1;">
+                                    @unreadCount
                                 </span>
-                                <button class="px-4 py-2 rounded-md text-white" style="background-color:#9e1b1b;" @onclick="Logout">Salir</button>
+                            }
+                        </button>
+
+                        <span class="text-slate-600">
+                            Usuario: @Auth.CurrentUserName (@Auth.CurrentUserRole)
+                        </span>
+                        <button class="px-4 py-2 rounded-md text-white" style="background-color:#9e1b1b;" @onclick="Logout">Salir</button>
                     }
-                    
                 </nav>
             </div>
         </div>
@@ -45,16 +61,144 @@
 </div>
 
 @code {
+    private bool showNoti;
+    private int unreadCount;
+    private List<FISEI.ServiceDesk.Web.Services.NotificacionDto> notis = new();
+    private bool _realtimeWired;
+
     private void Logout()
     {
         Auth.Logout();
-        try
+        try { Nav.NavigateTo("/login", true); }
+        catch (Microsoft.AspNetCore.Components.NavigationException) { }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsAuthenticated)
         {
-            Nav.NavigateTo("/login", true);
-        }
-        catch (Microsoft.AspNetCore.Components.NavigationException)
-        {
-            // Ignore navigation exception; it's expected during forced navigation.
+            await CargarNotis();
+
+            var apiClient = HttpFactory.CreateClient("Api");
+            var hubUrl = new Uri(apiClient.BaseAddress!, "/hubs/notificaciones").ToString();
+
+            await Notif.ConectarAsync(hubUrl, async () => Auth.GetToken());
+            Notif.OnMensajeCrudo += async _ =>
+            {
+                await CargarNotis();
+                await InvokeAsync(StateHasChanged);
+            };
+            _realtimeWired = true;
         }
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Conecta SignalR si el usuario inicia sesión después del primer render
+        if (!_realtimeWired && Auth.IsAuthenticated)
+        {
+            var apiClient = HttpFactory.CreateClient("Api");
+            var hubUrl = new Uri(apiClient.BaseAddress!, "/hubs/notificaciones").ToString();
+            await Notif.ConectarAsync(hubUrl, async () => Auth.GetToken());
+            Notif.OnMensajeCrudo += async _ =>
+            {
+                await CargarNotis();
+                await InvokeAsync(StateHasChanged);
+            };
+            _realtimeWired = true;
+            await CargarNotis();
+            StateHasChanged();
+        }
+    }
+
+    private async Task CargarNotis()
+    {
+        if (Auth.CurrentUserId is null) return;
+        notis = await NotifApi.ListarAsync(Auth.CurrentUserId.Value);
+        unreadCount = notis.Count(n => !n.Leida);
+    }
+
+    private async Task ToggleNoti()
+    {
+        showNoti = !showNoti;
+        if (showNoti)
+        {
+            await CargarNotis();
+        }
+    }
+
+    private async Task MarcarLeida(int id)
+    {
+        await NotifApi.MarcarLeidaAsync(id);
+        await CargarNotis();
+    }
+
+    private async Task MarcarTodasLeidas()
+    {
+        if (Auth.CurrentUserId is null) return;
+        await NotifApi.MarcarTodasLeidasAsync(Auth.CurrentUserId.Value);
+        await CargarNotis();
+    }
+}
+
+@if (showNoti)
+{
+    <div class="fixed inset-0" style="background:rgba(0,0,0,.3);z-index:9998" @onclick="ToggleNoti"></div>
+    <div class="fixed right-4 top-16 w-96 bg-white shadow-lg rounded-lg border border-slate-200" style="z-index:9999">
+        <div class="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="font-semibold">Notificaciones</h3>
+            <div class="flex items-center gap-2">
+                <button class="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100" @onclick="MarcarTodasLeidas">Marcar todas leídas</button>
+                <button class="text-slate-500" @onclick="ToggleNoti"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+        <div class="max-h-96 overflow-y-auto">
+            @if (notis.Count == 0)
+            {
+                <div class="p-4 text-sm text-slate-500">No hay notificaciones</div>
+            }
+            else
+            {
+                <ul class="divide-y divide-slate-200">
+                    @foreach (var n in notis)
+                    {
+                        <!-- Fondo distinto: rojo claro si no leída, blanco si leída -->
+                        <li class="p-3" style="background:@(n.Leida ? "#ffffff" : "#fff1f2")">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1">
+                                    <div class="text-xs text-slate-500">@n.Fecha.ToLocalTime()</div>
+                                    <div style="font-weight:@(n.Leida ? "500" : "700")">
+                                        @if (!string.IsNullOrWhiteSpace(n.Mensaje))
+                                        {
+                                            @n.Mensaje
+                                        }
+                                        else
+                                        {
+                                            @n.Tipo
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(n.Referencia))
+                                        {
+                                            <span class="ml-2 text-xs text-slate-600">@n.Referencia</span>
+                                        }
+                                    </div>
+                                    <div class="text-sm">@n.Mensaje</div>
+                                </div>
+                                <div class="mt-1 flex items-center gap-2">
+                                    <!-- indicador de estado -->
+                                    <span class="inline-block w-2 h-2 rounded-full" style="background:@(n.Leida ? "#9CA3AF" : "#DC2626")" title="@(n.Leida ? "Leída" : "Nueva")"></span>
+                                    @if (!n.Leida)
+                                    {
+                                        <!-- botón visto individual -->
+                                        <button class="inline-flex items-center justify-center w-7 h-7 rounded-full border border-slate-300 hover:bg-slate-100 text-slate-700" title="Marcar leída" @onclick="() => MarcarLeida(n.Id)">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
 }
