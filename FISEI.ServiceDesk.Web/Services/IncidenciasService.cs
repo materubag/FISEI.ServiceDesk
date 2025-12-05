@@ -32,21 +32,6 @@ public class IncidenciasService
         return baseList;
     }
 
-    public async Task<List<IncidenciaResumenDto>> ListarTodasAsync(string? texto, int? estadoId, int? prioridadId, int page = 1, int pageSize = 200)
-    {
-        var qs = new List<string>();
-        if (!string.IsNullOrWhiteSpace(texto)) qs.Add($"search={Uri.EscapeDataString(texto)}");
-        if (estadoId.HasValue) qs.Add($"estadoId={estadoId.Value}");
-        if (prioridadId.HasValue) qs.Add($"prioridadId={prioridadId.Value}");
-        if (page > 0) qs.Add($"page={page}");
-        if (pageSize > 0) qs.Add($"pageSize={pageSize}");
-        var query = qs.Count > 0 ? ("?" + string.Join("&", qs)) : string.Empty;
-
-        var list = await _http.GetFromJsonAsync<List<IncidenciaResumenDto>>($"/api/incidencias{query}")
-                   ?? new List<IncidenciaResumenDto>();
-        return list;
-    }
-
     public async Task<DashboardVmDto> GetDashboardAsync(int usuarioId)
     {
         // Construye un dashboard básico desde "mias"
@@ -78,64 +63,11 @@ public class IncidenciasService
     }
 
     public async Task<IncidenciaDetalleDto?> ObtenerDetalleAsync(int id)
-    {
-        var detalle = await _http.GetFromJsonAsync<IncidenciaDetalleDto>($"/api/incidencias/{id}");
-        if (detalle is null) return null;
-
-        try
-        {
-            // GET comentarios desde controlador ComentariosIncidencia
-            var apiComentarios = await _http.GetFromJsonAsync<List<ApiComentario>>($"/api/incidencias/{id}/ComentariosIncidencia")
-                                 ?? new List<ApiComentario>();
-
-            var cacheNombres = new Dictionary<int, string>();
-            var list = new List<ComentarioDto>();
-            foreach (var c in apiComentarios)
-            {
-                if (!cacheNombres.TryGetValue(c.UsuarioId, out var nombre))
-                {
-                    var u = await _http.GetFromJsonAsync<ApiUsuario>($"/api/usuarios/{c.UsuarioId}");
-                    nombre = u?.Nombre ?? $"Usuario #{c.UsuarioId}";
-                    cacheNombres[c.UsuarioId] = nombre;
-                }
-                list.Add(new ComentarioDto
-                {
-                    AutorNombre = nombre,
-                    Fecha = c.Fecha,
-                    EsInterno = c.EsInterno,
-                    Texto = c.Texto
-                });
-            }
-            detalle.Comentarios = list;
-        }
-        catch
-        {
-            // Ignorar errores de comentarios para no romper el detalle
-        }
-
-        return detalle;
-    }
+        => await _http.GetFromJsonAsync<IncidenciaDetalleDto>($"/api/incidencias/{id}");
 
     public async Task AgregarComentarioAsync(int id, ComentarioCrearDto dto)
     {
         var resp = await _http.PostAsJsonAsync($"/api/incidencias/{id}/comentarios", dto);
-        resp.EnsureSuccessStatusCode();
-    }
-
-    public async Task CambiarEstadoAsync(int id, int nuevoEstadoId, int actorId, string comentario)
-    {
-        var payload = new CambiarEstadoDto
-        {
-            NuevoEstadoId = nuevoEstadoId,
-            ActorId = actorId,
-            Comentario = comentario
-        };
-
-        using var req = new HttpRequestMessage(HttpMethod.Patch, $"/api/incidencias/{id}/estado")
-        {
-            Content = JsonContent.Create(payload)
-        };
-        var resp = await _http.SendAsync(req);
         resp.EnsureSuccessStatusCode();
     }
 }
@@ -217,26 +149,4 @@ public class ComentarioCrearDto
 {
     public string Texto { get; set; } = "";
     public bool EsInterno { get; set; }
-}
-
-public class CambiarEstadoDto
-{
-    public int NuevoEstadoId { get; set; }
-    public int ActorId { get; set; }
-    public string Comentario { get; set; } = "";
-}
-
-// Tipos auxiliares de consumo de API
-internal class ApiComentario
-{
-    public int UsuarioId { get; set; }
-    public string Texto { get; set; } = "";
-    public bool EsInterno { get; set; }
-    public DateTime Fecha { get; set; }
-}
-
-internal class ApiUsuario
-{
-    public int Id { get; set; }
-    public string Nombre { get; set; } = "";
 }

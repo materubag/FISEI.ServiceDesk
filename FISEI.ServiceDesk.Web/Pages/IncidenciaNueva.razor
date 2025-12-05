@@ -1,0 +1,89 @@
+@page "/incidencia/nueva"
+@using FISEI.ServiceDesk.Web.Services
+@inject NavigationManager Nav
+@inject AuthClientService Auth
+@inject IncidenciasService IncSvc
+@inject ServiciosService ServSvc
+@inject LaboratoriosService LabSvc
+
+@code {
+    private bool saving;
+    private string? error;
+    private NuevaIncidenciaDto model = new();
+    private List<ServicioDto> servicios = new();
+    private List<LaboratorioDto> laboratorios = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
+
+        var tServ = ServSvc.ListarAsync();
+        var tLabs = LabSvc.ListarAsync();
+        await Task.WhenAll(tServ, tLabs);
+        servicios = tServ.Result;
+        laboratorios = tLabs.Result;
+
+        model.CreadorId = Auth.CurrentUserId!.Value;
+        if (servicios.Count > 0)
+            model.ServicioId = servicios[0].Id;
+        if (model.PrioridadId == 0)
+            model.PrioridadId = 2; // Media por defecto
+        // Laboratorio es opcional: deja null por defecto
+    }
+
+    private async Task Guardar()
+    {
+        error = null; saving = true;
+        try {
+            var id = await IncSvc.CrearAsync(model);
+            Nav.NavigateTo($"/incidencia/{id}", false);
+        } catch (Exception ex) { error = ex.Message; }
+        finally { saving = false; }
+    }
+}
+
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-plus"></i></div><div class="university-info"><h1>Nueva Incidencia</h1></div></div>
+  </div>
+</header>
+
+<main class="main-content">
+  <section class="content-card">
+    @if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    <div class="form-stack">
+      <label class="form-label">Servicio
+        <InputSelect @bind-Value="model.ServicioId" class="form-control">
+          @foreach (var s in servicios) { <option value="@s.Id">@s.Nombre</option> }
+        </InputSelect>
+      </label>
+      <label class="form-label">Título
+        <input class="form-control" @bind="model.Titulo" />
+      </label>
+      <label class="form-label">Descripción
+        <textarea class="form-control" rows="5" @bind="model.Descripcion"></textarea>
+      </label>
+      <label class="form-label">Prioridad
+        <InputSelect @bind-Value="model.PrioridadId" class="form-control">
+          <option value="1">Baja</option>
+          <option value="2">Media</option>
+          <option value="3">Alta</option>
+          <option value="4">Crítica</option>
+        </InputSelect>
+      </label>
+      <label class="form-label">Laboratorio (opcional)
+        <InputSelect @bind-Value="model.LaboratorioId" class="form-control">
+          <option value="">Selecciona laboratorio (opcional)</option>
+          @foreach (var l in laboratorios)
+          {
+            <option value="@l.Id">@l.Nombre</option>
+          }
+        </InputSelect>
+      </label>
+      <div class="form-actions">
+        <button class="btn btn-primary" disabled="@saving" @onclick="Guardar"><i class="fas fa-paper-plane"></i> Registrar</button>
+        <a class="btn" href="/incidencias">Cancelar</a>
+      </div>
+    </div>
+  </section>
+</main>

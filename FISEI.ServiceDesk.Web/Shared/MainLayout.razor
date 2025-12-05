@@ -3,43 +3,31 @@
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 
 <div class="min-h-screen flex flex-col">
-    <header class="px-4 py-2 bg-white border-b border-slate-200">
-        <div class="flex items-center justify-between gap-4">
-            
-            <!-- LOGO A LA IZQUIERDA -->
-            <div class="flex items-center" style="width: 200px;">
-                <img src="/images/logo.png" alt="Logo" class="object-contain" style="height:70px;width:auto;" />
-            </div>
-
-            <!-- TÍTULO CENTRADO (POSICIÓN ABSOLUTA) -->
-            <div class="absolute left-1/2 transform -translate-x-1/2">
-                <a href="/" class="text-2xl font-semibold" style="color:#9e1b1b;">
-                    ServiceDesk
-                </a>
-            </div>
-
-            <!-- NAVEGACIÓN A LA DERECHA -->
-            <div class="ml-auto" style="width: 200px;">
-                <nav class="flex items-center justify-end gap-4 text-sm text-black">
-                    @if (Auth.IsAuthenticated)
-                    {
-                        
-                                <span class="text-slate-600">
-                                    Usuario: @Auth.CurrentUserName (@Auth.CurrentUserRole)
-                                </span>
-                                <button class="px-4 py-2 rounded-md text-white" style="background-color:#9e1b1b;" @onclick="Logout">Salir</button>
-                    }
-                    
-                </nav>
-            </div>
+    <header class="px-4 py-3 bg-[#101a33] border-b border-[#1e2a44] flex items-center justify-between">
+        <div class="text-lg font-semibold">
+            <a href="/">ServiceDesk</a>
         </div>
+        <nav class="flex items-center gap-4 text-sm">
+            @if (Auth.IsAuthenticated)
+            {
+                <a href="/incidencias">Incidencias</a>
+                <span class="text-slate-400">
+                    Usuario: @Auth.CurrentUserName (@Auth.CurrentUserRole)
+                </span>
+                <button class="btn btn-sm" @onclick="Logout">Salir</button>
+            }
+            else
+            {
+                <a href="/login">Login</a>
+            }
+        </nav>
     </header>
 
     <main class="flex-1">
         @Body
     </main>
 
-    <footer class="px-4 py-3 text-center text-xs text-slate-500 border-t border-slate-200">
+    <footer class="px-4 py-3 text-center text-xs text-slate-500 border-t border-[#1e2a44]">
         © @DateTime.UtcNow.Year FISEI Mesa de Ayuda
     </footer>
 </div>
@@ -48,13 +36,6 @@
     private void Logout()
     {
         Auth.Logout();
-        try
-        {
-            Nav.NavigateTo("/login", true);
-        }
-        catch (Microsoft.AspNetCore.Components.NavigationException)
-        {
-            // Ignore navigation exception; it's expected during forced navigation.
-        }
+        Nav.NavigateTo("/login", true);
     }
 }

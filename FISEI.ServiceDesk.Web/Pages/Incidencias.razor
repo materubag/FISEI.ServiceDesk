@@ -6,13 +6,9 @@
 @inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
 @inject FISEI.ServiceDesk.Web.Services.PrioridadesService PriSvc
 @inject FISEI.ServiceDesk.Web.Services.EstadosService EstSvc
-@inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
 @using System.Linq
 
 @code {
-  [Parameter, SupplyParameterFromQuery(Name = "estadoId")] public int? QEstadoId { get; set; }
-  [Parameter, SupplyParameterFromQuery(Name = "prioridadId")] public int? QPrioridadId { get; set; }
-  [Parameter, SupplyParameterFromQuery(Name = "search")] public string? QText { get; set; }
     private bool loading = true;
     private string? error;
     private List<IncidenciaResumenDto> items = new();
@@ -23,52 +19,27 @@
     private List<ServicioDto> servicios = new();
     private List<PrioridadDto> prioridades = new();
     private List<EstadoDto> estados = new();
-    private List<LaboratorioDto> laboratorios = new();
 
     private Dictionary<int,string> mapServicios = new();
     private Dictionary<int,string> mapPrioridades = new();
     private Dictionary<int,string> mapEstados = new();
 
-    // Modal Nueva Incidencia
-    private bool mostrarFormularioNueva = false;
-    private bool saving = false;
-    private NuevaIncidenciaDto modelNueva = new();
-
-    // Modal Detalle
-    private bool mostrarDetalle = false;
-    private int? incidenciaDetalleId = null;
-    private IncidenciaDetalleDto? incDetalle = null;
-    private bool loadingDetalle = false;
-    private string nuevoComentario = "";
-    private bool esInterno = false;
-
-    // Modal Resolver
-    private bool mostrarResolver = false;
-    private int? incidenciaResolverId = null;
-    private string comentarioResolver = "";
-    private bool savingResolver = false;
-    private int selectedEstadoResolverId = 3;
-
     protected override async Task OnInitializedAsync()
     {
+        
+
         try
         {
             if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
             var t1 = ServSvc.ListarAsync();
             var t2 = PriSvc.ListarAsync();
             var t3 = EstSvc.ListarAsync();
-            var t4 = LabSvc.ListarAsync();
-            await Task.WhenAll(t1, t2, t3, t4);
+            await Task.WhenAll(t1, t2, t3);
 
-            servicios = t1.Result; prioridades = t2.Result; estados = t3.Result; laboratorios = t4.Result;
-            mapServicios = servicios.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
-            mapPrioridades = prioridades.ToDictionary(x => x.Id, x => string.IsNullOrWhiteSpace(x.Nombre) ? $"#{x.Id}" : x.Nombre);
+            servicios = t1.Result; prioridades = t2.Result; estados = t3.Result;
+            mapServicios = servicios.ToDictionary(x => x.Id, x => x.Nombre);
+            mapPrioridades = prioridades.ToDictionary(x => x.Id, x => x.Nombre);
             mapEstados = estados.ToDictionary(x => x.Id, x => (string.IsNullOrWhiteSpace(x.Nombre) ? (x.Codigo ?? $"#{x.Id}") : x.Nombre));
-
-        // Aplicar filtros provenientes de querystring si existen
-        if (QEstadoId.HasValue) filtroEstadoId = QEstadoId;
-        if (QPrioridadId.HasValue) filtroPrioridadId = QPrioridadId;
-        if (!string.IsNullOrWhiteSpace(QText)) filtroTexto = QText!;
         }
         catch (Exception ex) { error = "Error cargando catálogos: " + ex.Message; }
 
@@ -80,28 +51,12 @@
         loading = true; error = null;
         try
         {
-        if (EsAdmin || EsTecnico)
-        {
-          items = await IncSvc.ListarTodasAsync(filtroTexto, filtroEstadoId, filtroPrioridadId);
-        }
-        else
-        {
-          items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
-        }
+            items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
             await ResolverNombresFaltantes();
         }
         catch (Exception ex) { error = ex.Message; }
         finally { loading = false; }
     }
-
-    private bool EsRol(string r)
-      => string.Equals(Auth.CurrentUserRole, r, StringComparison.OrdinalIgnoreCase);
-    private bool EsAdmin
-      => EsRol("ADMINISTRADOR") || EsRol("ADMIN") || EsRol("Administrador") || EsRol("Admin");
-    private bool EsTecnico
-      => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
-    private bool EsEstudianteODocente
-      => EsRol("ESTUDIANTE") || EsRol("DOCENTE") || EsRol("Estudiante") || EsRol("Docente");
 
     private async Task ResolverNombresFaltantes()
     {
@@ -111,8 +66,8 @@
                               .Select(x => x.ServicioId).Distinct().ToList();
         foreach (var id in faltanServ)
         {
-          var dto = await ServSvc.ObtenerAsync(id);
-          if (dto != null) mapServicios[id] = string.IsNullOrWhiteSpace(dto.Nombre) ? $"#{id}" : dto.Nombre;
+            var dto = await ServSvc.ObtenerAsync(id);
+            if (dto != null) mapServicios[id] = dto.Nombre;
         }
 
         // Prioridad
@@ -121,8 +76,8 @@
                              .Select(x => x.PrioridadId).Distinct().ToList();
         foreach (var id in faltanPri)
         {
-          var dto = await PriSvc.ObtenerAsync(id);
-          if (dto != null) mapPrioridades[id] = string.IsNullOrWhiteSpace(dto.Nombre) ? $"#{id}" : dto.Nombre;
+            var dto = await PriSvc.ObtenerAsync(id);
+            if (dto != null) mapPrioridades[id] = dto.Nombre;
         }
 
         // Estado
@@ -153,1197 +108,68 @@
     private string NombreEstado(IncidenciaResumenDto i)
         => !string.IsNullOrWhiteSpace(i.EstadoNombre) ? i.EstadoNombre
          : mapEstados.TryGetValue(i.EstadoId, out var n) ? n : $"#{i.EstadoId}";
-
-    // Modal Nueva Incidencia
-    private void AbrirFormularioNueva()
-    {
-      if (!EsEstudianteODocente) return;
-        modelNueva = new NuevaIncidenciaDto
-        {
-            CreadorId = Auth.CurrentUserId!.Value,
-            ServicioId = servicios.Count > 0 ? servicios[0].Id : 0,
-            PrioridadId = 2
-        };
-        mostrarFormularioNueva = true;
-    }
-
-    private async Task GuardarNuevaIncidencia()
-    {
-        error = null; saving = true;
-        try
-        {
-            var idNueva = await IncSvc.CrearAsync(modelNueva);
-            mostrarFormularioNueva = false;
-            await Cargar();
-            // Abrir detalle de la nueva incidencia
-            await AbrirDetalle(idNueva);
-        }
-        catch (Exception ex) { error = ex.Message; }
-        finally { saving = false; }
-    }
-
-    private void CancelarNueva() => mostrarFormularioNueva = false;
-
-    // Modal Detalle
-    private async Task AbrirDetalle(int id)
-    {
-        incidenciaDetalleId = id;
-        mostrarDetalle = true;
-        loadingDetalle = true;
-        try
-        {
-            incDetalle = await IncSvc.ObtenerDetalleAsync(id);
-            // Resolver nombres si es necesario
-            if (incDetalle != null)
-            {
-                if (string.IsNullOrWhiteSpace(incDetalle.ServicioNombre) && mapServicios.ContainsKey(incDetalle.ServicioId))
-                    incDetalle.ServicioNombre = mapServicios[incDetalle.ServicioId];
-                if (string.IsNullOrWhiteSpace(incDetalle.PrioridadNombre) && mapPrioridades.ContainsKey(incDetalle.PrioridadId))
-                    incDetalle.PrioridadNombre = mapPrioridades[incDetalle.PrioridadId];
-                if (string.IsNullOrWhiteSpace(incDetalle.EstadoNombre) && mapEstados.ContainsKey(incDetalle.EstadoId))
-                    incDetalle.EstadoNombre = mapEstados[incDetalle.EstadoId];
-
-          // Auto-cambiar a "EN_PROGRESO/EN_PROCESO" solo para Admin/Técnico y si el estado actual NO es final
-          var estadoActual = estados.FirstOrDefault(e => e.Id == incDetalle.EstadoId);
-          var esFinalActual = estadoActual?.EsFinal == true
-                    || string.Equals(estadoActual?.Codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(estadoActual?.Codigo, "CERRADO", StringComparison.OrdinalIgnoreCase);
-
-          if ((EsAdmin || EsTecnico) && !esFinalActual)
-          {
-            var estadoEnProceso = estados.FirstOrDefault(e =>
-              (!string.IsNullOrWhiteSpace(e.Codigo) && (
-                string.Equals(e.Codigo, "EN_PROGRESO", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(e.Codigo, "EN_PROCESO", StringComparison.OrdinalIgnoreCase)
-                || e.Codigo.Contains("PROGRES", StringComparison.OrdinalIgnoreCase)
-                || e.Codigo.Contains("PROCES", StringComparison.OrdinalIgnoreCase)))
-              || (!string.IsNullOrWhiteSpace(e.Nombre) && (
-                e.Nombre.Contains("progreso", StringComparison.OrdinalIgnoreCase)
-                || e.Nombre.Contains("proceso", StringComparison.OrdinalIgnoreCase)))
-            );
-
-            if (estadoEnProceso != null && incDetalle.EstadoId != estadoEnProceso.Id)
-            {
-              try
-              {
-                await IncSvc.CambiarEstadoAsync(id, estadoEnProceso.Id, Auth.CurrentUserId!.Value, "Marcado como En proceso al ver detalle");
-                // Refrescar detalle y listado para reflejar el nuevo estado
-                incDetalle = await IncSvc.ObtenerDetalleAsync(id);
-                if (incDetalle != null)
-                {
-                  if (string.IsNullOrWhiteSpace(incDetalle.ServicioNombre) && mapServicios.ContainsKey(incDetalle.ServicioId))
-                    incDetalle.ServicioNombre = mapServicios[incDetalle.ServicioId];
-                  if (string.IsNullOrWhiteSpace(incDetalle.PrioridadNombre) && mapPrioridades.ContainsKey(incDetalle.PrioridadId))
-                    incDetalle.PrioridadNombre = mapPrioridades[incDetalle.PrioridadId];
-                  if (string.IsNullOrWhiteSpace(incDetalle.EstadoNombre) && mapEstados.ContainsKey(incDetalle.EstadoId))
-                    incDetalle.EstadoNombre = mapEstados[incDetalle.EstadoId];
-                }
-                await Cargar();
-              }
-              catch (Exception exAuto)
-              {
-                // No bloquear el detalle si falla el cambio automático
-                error = error is null ? exAuto.Message : error;
-              }
-            }
-          }
-            }
-        }
-        catch (Exception ex) { error = ex.Message; }
-        finally { loadingDetalle = false; }
-    }
-
-    private void CerrarDetalle()
-    {
-        mostrarDetalle = false;
-        incidenciaDetalleId = null;
-        incDetalle = null;
-        nuevoComentario = "";
-    }
-
-    private async Task EnviarComentario()
-    {
-        if (string.IsNullOrWhiteSpace(nuevoComentario) || incidenciaDetalleId == null) return;
-        try
-        {
-            await IncSvc.AgregarComentarioAsync(incidenciaDetalleId.Value, new ComentarioCrearDto { Texto = nuevoComentario, EsInterno = esInterno });
-            nuevoComentario = "";
-            esInterno = false;
-            await AbrirDetalle(incidenciaDetalleId.Value); // Recargar
-        }
-        catch (Exception ex) { error = ex.Message; }
-    }
-
-    private void AbrirResolver(int id)
-    {
-      incidenciaResolverId = id;
-      comentarioResolver = "Se resolvió";
-      selectedEstadoResolverId = items.FirstOrDefault(x => x.Id == id)?.EstadoId ?? 3;
-      mostrarResolver = true;
-    }
-
-    private void CerrarResolver()
-    {
-      mostrarResolver = false;
-      incidenciaResolverId = null;
-      comentarioResolver = "";
-      savingResolver = false;
-    }
-
-    private async Task ConfirmarResolver()
-    {
-      if (incidenciaResolverId == null) return;
-      savingResolver = true;
-      try
-      {
-        var comentario = string.IsNullOrWhiteSpace(comentarioResolver) ? "Se resolvió" : comentarioResolver.Trim();
-        await IncSvc.CambiarEstadoAsync(incidenciaResolverId.Value, selectedEstadoResolverId, Auth.CurrentUserId!.Value, comentario);
-        CerrarResolver();
-        await Cargar();
-        if (mostrarDetalle && incidenciaDetalleId.HasValue && incidenciaDetalleId.Value == incidenciaResolverId.Value)
-        {
-          await AbrirDetalle(incidenciaResolverId.Value);
-        }
-      }
-      catch (Exception ex)
-      {
-        error = ex.Message;
-      }
-      finally { savingResolver = false; }
-    }
 }
 
-<RoleNav />
+<header class="institutional-header">
+  <div class="header-container">
+    <div class="logo-container"><div class="uta-logo"><i class="fas fa-university"></i></div><div class="university-info"><h1>Incidencias</h1><p>Listado y filtros</p></div></div>
+    <a class="btn btn-primary" href="/incidencia/nueva"><i class="fas fa-plus"></i> Nueva</a>
+  </div>
+</header>
+
 <main class="main-content">
   <section class="content-card">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title"><i class="fas fa-list-alt"></i> Incidencias</h2>
-        <p class="page-subtitle">Gestiona las incidencias del sistema</p>
-      </div>
-      @if (!loading && EsEstudianteODocente)
-      {
-        <button class="btn btn-primary btn-new" @onclick="AbrirFormularioNueva">
-          <i class="fas fa-plus"></i> Nueva incidencia
-        </button>
-      }
+    <div class="card-header">
+      <h2><i class="fas fa-filter"></i> Filtros</h2>
+      <button class="btn" @onclick="Cargar"><i class="fas fa-sync-alt"></i> Actualizar</button>
     </div>
-
-    <!-- Filtros -->
-    <div class="filters-section">
-      <div class="filters-header">
-        <h3><i class="fas fa-filter"></i> Filtros</h3>
-        <button class="btn-icon btn-refresh" @onclick="Cargar" title="Actualizar">
-          <i class="fas fa-sync-alt"></i>
-        </button>
-      </div>
-      <div class="filters-grid">
-        <div class="form-group">
-          <label><i class="fas fa-search"></i> Buscar</label>
-          <input class="form-control" placeholder="Título, descripción..." @bind="filtroTexto" />
-        </div>
-        <div class="form-group">
-          <label><i class="fas fa-flag"></i> Estado</label>
-          <InputSelect @bind-Value="filtroEstadoId" class="form-control">
-            <option value="">Todos los estados</option>
-            @foreach (var e in estados)
-            {
-              var nombreEstado = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : (e.Codigo ?? $"#{e.Id}");
-              <option value="@e.Id">@nombreEstado</option>
-            }
-          </InputSelect>
-        </div>
-        <div class="form-group">
-          <label><i class="fas fa-exclamation-circle"></i> Prioridad</label>
-          <InputSelect @bind-Value="filtroPrioridadId" class="form-control">
-            <option value="">Todas las prioridades</option>
-            @foreach (var p in prioridades)
-            {
-              var pn = string.IsNullOrWhiteSpace(p.Nombre) ? $"#{p.Id}" : p.Nombre;
-              <option value="@p.Id">@pn</option>
-            }
-          </InputSelect>
-        </div>
-        <div class="form-group-action">
-          <button class="btn btn-primary" @onclick="Cargar">
-            <i class="fas fa-search"></i> Aplicar
-          </button>
-        </div>
+    <div class="form-stack">
+      <input class="form-control" placeholder="Buscar..." @bind="filtroTexto" />
+      <div style="display:flex;gap:8px;align-items:center">
+        <InputSelect @bind-Value="filtroEstadoId" class="form-control">
+          <option value="">Estado (todos)</option>
+          @foreach (var e in estados)
+          {
+            <option value="@e.Id">@e.Nombre</option>
+          }
+        </InputSelect>
+        <InputSelect @bind-Value="filtroPrioridadId" class="form-control">
+          <option value="">Prioridad (todas)</option>
+          @foreach (var p in prioridades)
+          {
+            <option value="@p.Id">@p.Nombre</option>
+          }
+        </InputSelect>
+        <button class="btn btn-primary" @onclick="Cargar"><i class="fas fa-search"></i> Aplicar</button>
       </div>
     </div>
+  </section>
 
-    @if (loading)
-    {
-      <div class="loading-container">
-        <div class="spinner"></div>
-        <p class="muted">Cargando incidencias...</p>
-      </div>
-    }
-    else if (!string.IsNullOrEmpty(error))
-    {
-      <div class="alert alert-error">
-        <i class="fas fa-exclamation-circle"></i> @error
-      </div>
-    }
-    else if (items.Count == 0)
-    {
-      <div class="empty-state">
-        <i class="fas fa-inbox"></i>
-        <h3>No hay incidencias</h3>
-        <p>No se encontraron incidencias con los filtros aplicados</p>
-        <button class="btn btn-primary" @onclick="AbrirFormularioNueva">
-          <i class="fas fa-plus"></i> Crear incidencia
-        </button>
-      </div>
-    }
+  <section class="content-card">
+    @if (loading) { <p class="muted">Cargando...</p> }
+    else if (!string.IsNullOrEmpty(error)) { <div class="alert-error">@error</div> }
+    else if (items.Count == 0) { <p class="muted">Sin resultados</p> }
     else
     {
       <div class="table-container">
-        <table class="table-modern">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Fecha</th>
-              <th>Servicio</th>
-              <th>Título</th>
-              <th>Prioridad</th>
-              <th>Estado</th>
-              <th class="text-end">Acciones</th>
-            </tr>
-          </thead>
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>Fecha</th><th>Servicio</th><th>Título</th><th>Prioridad</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             @foreach (var t in items)
             {
               <tr>
-                <td><span class="badge badge-id">@t.Id</span></td>
-                <td class="text-muted">@t.FechaCreacion.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
-                <td>
-                  <span class="badge badge-category">
-                    <i class="fas fa-wrench"></i> @NombreServicio(t)
-                  </span>
-                </td>
-                <td class="fw-medium">@t.Titulo</td>
-                <td>
-                  @{
-                    var prioNombre = NombrePrioridad(t).ToLower();
-                    var prioBadgeClass = prioNombre.Contains("alta") || prioNombre.Contains("crítica") ? "badge-danger" 
-                                       : prioNombre.Contains("media") ? "badge-warning" 
-                                       : "badge-success";
-                  }
-                  <span class="badge @prioBadgeClass">
-                    <i class="fas fa-exclamation-circle"></i> @NombrePrioridad(t)
-                  </span>
-                </td>
-                <td>
-                  @{
-                    var estadoNombre = NombreEstado(t).ToLower();
-                    var estadoBadgeClass = estadoNombre.Contains("resuelto") || estadoNombre.Contains("cerrado") ? "badge-success"
-                                         : estadoNombre.Contains("progreso") || estadoNombre.Contains("asignado") ? "badge-warning"
-                                         : "badge-info";
-                  }
-                  <span class="badge @estadoBadgeClass">
-                    <i class="fas fa-info-circle"></i> @NombreEstado(t)
-                  </span>
-                </td>
-                <td class="text-end">
-                  <div class="action-buttons">
-                    <button class="btn-icon btn-view" @onclick="() => AbrirDetalle(t.Id)" title="Ver detalles">
-                      <i class="fas fa-eye"></i>
-                    </button>
-                    @if (EsAdmin || EsTecnico)
-                    {
-                      <button class="btn-icon btn-view" @onclick="() => AbrirResolver(t.Id)" title="Resolver">
-                        <i class="fas fa-check"></i>
-                      </button>
-                    }
-                  </div>
-                </td>
+                <td>@t.Id</td>
+                <td>@t.FechaCreacion.ToLocalTime()</td>
+                <td>@NombreServicio(t)</td>
+                <td>@t.Titulo</td>
+                <td>@NombrePrioridad(t)</td>
+                <td>@NombreEstado(t)</td>
+                <td><a class="btn" href="@($"/incidencia/{t.Id}")"><i class="fas fa-eye"></i> Ver</a></td>
               </tr>
             }
           </tbody>
         </table>
       </div>
     }
-
-    @* Modal Nueva Incidencia *@
-    @if (mostrarFormularioNueva)
-    {
-      <div class="modal-overlay" @onclick="CancelarNueva">
-        <div class="modal modal-large" @onclick:stopPropagation="true">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="fas fa-plus-circle"></i> Nueva Incidencia
-            </h5>
-            <button class="btn-close" @onclick="CancelarNueva" title="Cerrar">×</button>
-          </div>
-          <div class="modal-body">
-            @if (!string.IsNullOrEmpty(error)) { <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> @error</div> }
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label"><i class="fas fa-wrench"></i> Servicio</label>
-                <InputSelect @bind-Value="modelNueva.ServicioId" class="form-control">
-                  @foreach (var s in servicios) { var sn = string.IsNullOrWhiteSpace(s.Nombre) ? $"#{s.Id}" : s.Nombre; <option value="@s.Id">@sn</option> }
-                </InputSelect>
-              </div>
-              <div class="form-group">
-                <label class="form-label"><i class="fas fa-exclamation-circle"></i> Prioridad</label>
-                <InputSelect @bind-Value="modelNueva.PrioridadId" class="form-control">
-                  <option value="1">Baja</option>
-                  <option value="2">Media</option>
-                  <option value="3">Alta</option>
-                  <option value="4">Crítica</option>
-                </InputSelect>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label"><i class="fas fa-heading"></i> Título</label>
-              <input class="form-control" @bind="modelNueva.Titulo" placeholder="Ej: No funciona la pc del laboratorio" />
-            </div>
-            <div class="form-group">
-              <label class="form-label"><i class="fas fa-align-left"></i> Descripción</label>
-              <textarea class="form-control" rows="4" @bind="modelNueva.Descripcion" placeholder="Describe el problema en detalle..."></textarea>
-            </div>
-            <div class="form-group">
-              <label class="form-label"><i class="fas fa-building"></i> Laboratorio (opcional)</label>
-              <InputSelect @bind-Value="modelNueva.LaboratorioId" class="form-control">
-                <option value="">Sin laboratorio específico</option>
-                @foreach (var l in laboratorios)
-                {
-                  var ln = string.IsNullOrWhiteSpace(l.Nombre) ? $"#{l.Id}" : l.Nombre;
-                  <option value="@l.Id">@ln</option>
-                }
-              </InputSelect>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-success" disabled="@saving" @onclick="GuardarNuevaIncidencia">
-              <i class="fas fa-paper-plane"></i> @(saving ? "Guardando..." : "Crear Incidencia")
-            </button>
-            <button type="button" class="btn btn-secondary" @onclick="CancelarNueva">
-              <i class="fas fa-times"></i> Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    }
-
-    @* Modal Detalle Incidencia *@
-    @if (mostrarDetalle && incidenciaDetalleId != null)
-    {
-      <div class="modal-overlay" @onclick="CerrarDetalle">
-        <div class="modal modal-xl" @onclick:stopPropagation="true">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="fas fa-ticket-alt"></i> Incidencia #@incidenciaDetalleId
-            </h5>
-            <button class="btn-close" @onclick="CerrarDetalle" title="Cerrar">×</button>
-          </div>
-          <div class="modal-body">
-            @if (loadingDetalle)
-            {
-              <div class="loading-container-small">
-                <div class="spinner-small"></div>
-                <p class="muted">Cargando detalles...</p>
-              </div>
-            }
-            else if (incDetalle == null)
-            {
-              <p class="muted">No se pudo cargar la incidencia</p>
-            }
-            else
-            {
-              <div class="detalle-grid">
-                <div class="detalle-section">
-                  <h4><i class="fas fa-info-circle"></i> Información</h4>
-                  <div class="detalle-info">
-                    <div class="info-row">
-                      <span class="info-label">Título:</span>
-                      <span class="info-value fw-medium">@incDetalle.Titulo</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Descripción:</span>
-                      <span class="info-value">@incDetalle.Descripcion</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Servicio:</span>
-                      <span class="badge badge-category">
-                        <i class="fas fa-wrench"></i> @incDetalle.ServicioNombre
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Prioridad:</span>
-                      @{
-                        var prioNombre = incDetalle.PrioridadNombre?.ToLower() ?? "";
-                        var prioBadgeClass = prioNombre.Contains("alta") || prioNombre.Contains("crítica") ? "badge-danger" 
-                                           : prioNombre.Contains("media") ? "badge-warning" 
-                                           : "badge-success";
-                      }
-                      <span class="badge @prioBadgeClass">
-                        <i class="fas fa-exclamation-circle"></i> @incDetalle.PrioridadNombre
-                      </span>
-                    </div>
-                    <div class="info-row">
-                      <span class="info-label">Estado:</span>
-                      @{
-                        var estadoNombre = incDetalle.EstadoNombre?.ToLower() ?? "";
-                        var estadoBadgeClass = estadoNombre.Contains("resuelto") || estadoNombre.Contains("cerrado") ? "badge-success"
-                                             : estadoNombre.Contains("progreso") || estadoNombre.Contains("asignado") ? "badge-warning"
-                                             : "badge-info";
-                      }
-                      <span class="badge @estadoBadgeClass">
-                        <i class="fas fa-flag"></i> @incDetalle.EstadoNombre
-                      </span>
-                    </div>
-
-                  </div>
-                </div>
-
-                <div class="detalle-section">
-                  <h4><i class="fas fa-comments"></i> Comentarios (@(incDetalle.Comentarios?.Count ?? 0))</h4>
-                  @if (incDetalle.Comentarios?.Count > 0)
-                  {
-                    <div class="comentarios-list">
-                      @foreach (var c in incDetalle.Comentarios)
-                      {
-                        <div class="comentario-item @(c.EsInterno ? "comentario-interno" : "")">
-                          <div class="comentario-header">
-                            <span class="comentario-autor">
-                              <i class="fas fa-user-circle"></i> @c.AutorNombre
-                            </span>
-                            <span class="comentario-fecha text-muted">
-                              @c.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
-                            </span>
-                            @if (c.EsInterno)
-                            {
-                              <span class="badge badge-warning"><i class="fas fa-lock"></i> Interno</span>
-                            }
-                          </div>
-                          <div class="comentario-texto">@c.Texto</div>
-                        </div>
-                      }
-                    </div>
-                  }
-                  else
-                  {
-                    <p class="muted">No hay comentarios aún</p>
-                  }
-
-                  @* Formulario para agregar comentario removido por solicitud *@
-                </div>
-              </div>
-            }
-          </div>
-        </div>
-      </div>
-    }
-
-    @* Modal Resolver Incidencia *@
-    @if (mostrarResolver && incidenciaResolverId != null && (EsAdmin || EsTecnico))
-    {
-      <div class="modal-overlay" @onclick="CerrarResolver">
-        <div class="modal modal-large" @onclick:stopPropagation="true">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="fas fa-check-circle"></i> Resolver incidencia #@incidenciaResolverId
-            </h5>
-            <button class="btn-close" @onclick="CerrarResolver" title="Cerrar">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="form-grid">
-              <div class="form-group">
-                <label class="form-label"><i class="fas fa-flag"></i> Estado</label>
-                <InputSelect @bind-Value="selectedEstadoResolverId" class="form-control">
-                  @foreach (var e in estados)
-                  {
-                    var nombre = !string.IsNullOrWhiteSpace(e.Nombre) ? e.Nombre : (e.Codigo ?? $"#{e.Id}");
-                    <option value="@e.Id">@nombre</option>
-                  }
-                </InputSelect>
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label"><i class="fas fa-comment-dots"></i> Comentario de resolución</label>
-              <textarea class="form-control" rows="4" @bind="comentarioResolver" placeholder="Describe brevemente la solución..."></textarea>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-success" disabled="@savingResolver" @onclick="ConfirmarResolver">
-              <i class="fas fa-check"></i> @(savingResolver ? "Resolviendo..." : "Resolver")
-            </button>
-            <button class="btn btn-secondary" @onclick="CerrarResolver">
-              <i class="fas fa-times"></i> Cancelar
-            </button>
-          </div>
-        </div>
-      </div>
-    }
   </section>
 </main>
-
-<style>
-  /* Filters Section */
-  .filters-section {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    border-left: 4px solid #8B0000;
-  }
-
-  .filters-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-  }
-
-  .filters-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    color: #2c3e50;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .filters-header i {
-    color: #8B0000;
-  }
-
-  .filters-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1fr auto;
-    gap: 1rem;
-    align-items: end;
-  }
-
-  .form-group label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
-    color: #495057;
-    font-size: 0.9rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .form-group label i {
-    color: #8B0000;
-    font-size: 0.85rem;
-  }
-
-  .form-control {
-    width: 100%;
-    padding: 0.625rem 1rem;
-    border: 2px solid #dee2e6;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    transition: all 0.2s;
-  }
-
-  .form-control:focus {
-    outline: none;
-    border-color: #8B0000;
-    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
-  }
-
-  .form-group-action {
-    display: flex;
-    align-items: flex-end;
-  }
-
-  
-  /* Main Content */
-  .main-content {
-    max-width: 1400px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-  }
-
-  .content-card {
-    background: white;
-    border-radius: 12px;
-    padding: 2rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-
-  /* Page Header */
-  .page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #e9ecef;
-  }
-
-  .page-title {
-    font-size: 1.75rem;
-    font-weight: 600;
-    color: #2c3e50;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .page-title i {
-    color: #8B0000;
-  }
-
-  .page-subtitle {
-    color: #6c757d;
-    margin: 0.25rem 0 0 0;
-    font-size: 0.95rem;
-  }
-
-  /* Buttons */
-  .btn {
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    text-decoration: none;
-  }
-
-  .btn-primary {
-    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
-    color: white;
-  }
-
-  .btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(139, 0, 0, 0.4);
-  }
-
-  .btn-icon {
-    width: 36px;
-    height: 36px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-size: 0.9rem;
-  }
-
-  .btn-refresh {
-    background: #6c757d;
-    color: white;
-  }
-
-  .btn-refresh:hover {
-    background: #5a6268;
-    transform: scale(1.05);
-  }
-
-  .btn-view {
-    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
-    color: white;
-  }
-
-  .btn-view:hover {
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(139, 0, 0, 0.3);
-  }
-
-  /* Table */
-  .table-container {
-    background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  }
-
-  .table-modern {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .table-modern thead {
-    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
-    color: white;
-  }
-
-  .table-modern th {
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 0.85rem;
-    letter-spacing: 0.5px;
-  }
-
-  .table-modern td {
-    padding: 1rem;
-    border-bottom: 1px solid #e9ecef;
-  }
-
-  .table-modern tbody tr {
-    transition: background-color 0.2s;
-  }
-
-  .table-modern tbody tr:hover {
-    background-color: #f8f9fa;
-  }
-
-  .text-end {
-    text-align: right;
-  }
-
-  .text-muted {
-    color: #6c757d;
-    font-size: 0.9rem;
-  }
-
-  .fw-medium {
-    font-weight: 500;
-  }
-
-  .action-buttons {
-    display: flex;
-    gap: 0.5rem;
-    justify-content: flex-end;
-  }
-
-  /* Badges */
-  .badge {
-    padding: 0.35rem 0.75rem;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .badge-id {
-    background: #e9ecef;
-    color: #495057;
-    font-family: 'Courier New', monospace;
-  }
-
-  .badge-category {
-    background: #fee2e2;
-    color: #8B0000;
-  }
-
-  .badge-success {
-    background: #d4edda;
-    color: #155724;
-  }
-
-  .badge-warning {
-    background: #fff3cd;
-    color: #856404;
-  }
-
-  .badge-danger {
-    background: #f8d7da;
-    color: #721c24;
-  }
-
-  .badge-info {
-    background: #e3f2fd;
-    color: #1976d2;
-  }
-
-  /* Loading */
-  .loading-container {
-    text-align: center;
-    padding: 3rem;
-  }
-
-  .spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #8B0000;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-  }
-
-  @@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .muted {
-    color: #6c757d;
-    font-size: 0.95rem;
-  }
-
-  /* Empty State */
-  .empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-  }
-
-  .empty-state i {
-    font-size: 4rem;
-    color: #dee2e6;
-    margin-bottom: 1rem;
-  }
-
-  .empty-state h3 {
-    color: #495057;
-    margin-bottom: 0.5rem;
-  }
-
-  .empty-state p {
-    color: #6c757d;
-    margin-bottom: 1.5rem;
-  }
-
-  /* Alert */
-  .alert {
-    padding: 1rem;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .alert-error {
-    background: #f8d7da;
-    color: #721c24;
-    border-left: 4px solid #c62828;
-  }
-
-  /* Modal */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.2s;
-  }
-  .modal {
-    background: white;
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 90vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-    animation: slideUp 0.3s;
-  }
-  .modal-large {
-    max-width: 800px;
-  }
-  .modal-xl {
-    max-width: 1000px;
-  }
-  .modal-header {
-    padding: 1.25rem 1.5rem;
-    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .modal-title {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .btn-close {
-    background: rgba(255,255,255,0.2);
-    border: none;
-    color: white;
-    font-size: 1.5rem;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-  }
-  .btn-close:hover {
-    background: rgba(255,255,255,0.3);
-  }
-  .modal-body {
-    padding: 1.5rem;
-    overflow-y: auto;
-    flex: 1;
-  }
-  .modal-footer {
-    padding: 1rem 1.5rem;
-    background: #f8f9fa;
-    border-top: 1px solid #dee2e6;
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-  }
-
-  /* Form Grid */
-  .form-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-  .form-label {
-    font-weight: 500;
-    color: #495057;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .form-label i {
-    color: #8B0000;
-    font-size: 0.85rem;
-  }
-  .btn-success {
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-    color: white;
-  }
-  .btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
-  }
-  .btn-secondary {
-    background: #6c757d;
-    color: white;
-  }
-  .btn-secondary:hover {
-    background: #5a6268;
-  }
-
-  /* Detalle Grid */
-  .detalle-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-  }
-  .detalle-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .detalle-section h4 {
-    font-size: 1.1rem;
-    color: #2c3e50;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #e9ecef;
-  }
-  .detalle-section h4 i {
-    color: #8B0000;
-  }
-  .detalle-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .info-row {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-  }
-  .info-label {
-    font-weight: 600;
-    color: #6c757d;
-    min-width: 100px;
-    font-size: 0.9rem;
-  }
-  .info-value {
-    flex: 1;
-  }
-
-  /* Comentarios */
-  .comentarios-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    max-height: 300px;
-    overflow-y: auto;
-    padding-right: 0.5rem;
-  }
-  .comentario-item {
-    background: #f8f9fa;
-    border-radius: 8px;
-    padding: 1rem;
-    border-left: 3px solid #8B0000;
-  }
-  .comentario-interno {
-    background: #fff3cd;
-    border-left-color: #f59e0b;
-  }
-  .comentario-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .comentario-autor {
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-  .comentario-fecha {
-    font-size: 0.85rem;
-  }
-  .comentario-texto {
-    color: #495057;
-    line-height: 1.5;
-  }
-  .comentario-form {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 2px solid #e9ecef;
-  }
-  .comentario-form h5 {
-    font-size: 1rem;
-    margin: 0 0 0.75rem 0;
-    color: #2c3e50;
-  }
-  .comentario-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.75rem;
-    gap: 1rem;
-  }
-  .custom-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .custom-checkbox label {
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.9rem;
-  }
-
-  /* Loading Small */
-  .loading-container-small {
-    text-align: center;
-    padding: 2rem;
-  }
-  .spinner-small {
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #8B0000;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 1rem;
-  }
-
-  /* Animations */
-  @@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  @@keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  /* Responsive */
-  @@media (max-width: 992px) {
-    .filters-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .form-group-action {
-      align-items: stretch;
-    }
-
-    .form-group-action .btn {
-      width: 100%;
-    }
-
-    .detalle-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .form-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @@media (max-width: 768px) {
-    .page-header {
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .btn-new {
-      width: 100%;
-      justify-content: center;
-    }
-
-    .table-modern th,
-    .table-modern td {
-      padding: 0.75rem 0.5rem;
-      font-size: 0.85rem;
-    }
-
-    .modal {
-      width: 95%;
-      max-height: 95vh;
-    }
-
-    .modal-body {
-      padding: 1rem;
-    }
-
-    .info-row {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-    }
-
-    .info-label {
-      min-width: auto;
-    }
-  }
-</style>
