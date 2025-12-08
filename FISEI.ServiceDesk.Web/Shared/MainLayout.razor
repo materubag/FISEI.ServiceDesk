@@ -56,7 +56,7 @@
     </main>
 
     <footer class="px-4 py-3 text-center text-xs text-slate-500 border-t border-slate-200">
-        © @DateTime.UtcNow.Year FISEI Mesa de Ayuda
+        � @DateTime.UtcNow.Year FISEI Mesa de Ayuda
     </footer>
 </div>
 
@@ -65,6 +65,7 @@
     private int unreadCount;
     private List<FISEI.ServiceDesk.Web.Services.NotificacionDto> notis = new();
     private bool _realtimeWired;
+    private string? notiError;
 
     private void Logout()
     {
@@ -114,8 +115,18 @@
     private async Task CargarNotis()
     {
         if (Auth.CurrentUserId is null) return;
-        notis = await NotifApi.ListarAsync(Auth.CurrentUserId.Value);
-        unreadCount = notis.Count(n => !n.Leida);
+        try
+        {
+            notiError = null;
+            notis = await NotifApi.ListarAsync(Auth.CurrentUserId.Value);
+            unreadCount = notis.Count(n => !n.Leida);
+        }
+        catch (Exception ex)
+        {
+            notiError = ex.Message;
+            notis = new();
+            unreadCount = 0;
+        }
     }
 
     private async Task ToggleNoti()
@@ -124,6 +135,7 @@
         if (showNoti)
         {
             await CargarNotis();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -144,7 +156,7 @@
 @if (showNoti)
 {
     <div class="fixed inset-0" style="background:rgba(0,0,0,.3);z-index:9998" @onclick="ToggleNoti"></div>
-    <div class="fixed right-4 top-16 w-96 bg-white shadow-lg rounded-lg border border-slate-200" style="z-index:9999">
+    <div class="fixed bg-white shadow-lg rounded-lg border border-slate-200" style="z-index:9999;position:fixed;top:72px;right:16px;left:auto;bottom:auto;width:380px;max-width:min(420px, calc(100vw - 32px));pointer-events:auto;">
         <div class="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
             <h3 class="font-semibold">Notificaciones</h3>
             <div class="flex items-center gap-2">
@@ -152,7 +164,13 @@
                 <button class="text-slate-500" @onclick="ToggleNoti"><i class="fas fa-times"></i></button>
             </div>
         </div>
-        <div class="max-h-96 overflow-y-auto">
+        <div style="max-height:420px;overflow-y:auto;">
+            @if (!string.IsNullOrEmpty(notiError))
+            {
+                <div class="p-4 text-sm text-red-600">@notiError</div>
+            }
+            else
+            {
             @if (notis.Count == 0)
             {
                 <div class="p-4 text-sm text-slate-500">No hay notificaciones</div>
@@ -198,6 +216,7 @@
                         </li>
                     }
                 </ul>
+            }
             }
         </div>
     </div>

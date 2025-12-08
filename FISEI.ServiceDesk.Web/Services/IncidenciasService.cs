@@ -156,6 +156,18 @@ public class IncidenciasService
         var resp = await _http.SendAsync(req);
         resp.EnsureSuccessStatusCode();
     }
+
+    public async Task AsignarTecnicoAsync(int incidenciaId, int tecnicoId, int asignadoPorId)
+    {
+        var payload = new { TecnicoId = tecnicoId, AsignadoPorId = asignadoPorId };
+
+        using var req = new HttpRequestMessage(HttpMethod.Patch, $"/api/incidencias/{incidenciaId}/asignar")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        var resp = await _http.SendAsync(req);
+        resp.EnsureSuccessStatusCode();
+    }
 }
 
 // Modelos auxiliares para mapear la respuesta del catálogo (IncidenciasExtraController GET /api/incidencias)
@@ -217,6 +229,8 @@ public class IncidenciaDetalleDto
     public string? ServicioNombre { get; set; }
     public string? PrioridadNombre { get; set; }
     public string? EstadoNombre { get; set; }
+    public int? TecnicoAsignadoId { get; set; }
+    public string? TecnicoAsignadoNombre { get; set; }
     public List<ComentarioDto> Comentarios { get; set; } = new();
 }
 

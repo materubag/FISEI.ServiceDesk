@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 
 <div class="min-h-screen bg-gray-100 flex flex-col">
+  
 
   <main class="flex-1 flex items-center justify-center px-4 py-12">
     <div class="w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200">
@@ -25,12 +26,12 @@
           <ValidationSummary />
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700">Correo institucional</label>
-              <InputText @bind-Value="loginModel.Email" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+              <label class="block text-sm font-medium text-gray-700 ">Correo institucional</label>
+              <InputText @bind-Value="loginModel.Email" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700 text-black" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Contraseña</label>
-              <InputText @bind-Value="loginModel.Password" type="password" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700" />
+              <InputText @bind-Value="loginModel.Password" type="password" class="mt-1 w-full rounded-md border-gray-300 focus:border-red-700 focus:ring-red-700 text-black" />
             </div>
             <div class="flex items-center justify-between">
               <label class="inline-flex items-center gap-2 text-sm text-gray-700">

@@ -59,6 +59,20 @@ public class UsuariosController : ControllerBase
         return Ok(data);
     }
 
+    // GET /api/usuarios/tecnicos
+    [HttpGet("tecnicos")]
+    public async Task<ActionResult<IEnumerable<UsuarioDto>>> GetTecnicos()
+    {
+        var tecnicos = await _db.Usuarios
+            .AsNoTracking()
+            .Where(u => u.RolId == 2 && u.Activo) // RolId 2 = Técnico
+            .OrderBy(u => u.Nombre)
+            .Select(u => new UsuarioDto(u.Id, u.Nombre, u.Correo, u.RolId, u.Activo, u.FechaRegistro))
+            .ToListAsync();
+
+        return Ok(tecnicos);
+    }
+
     // GET /api/usuarios/{id}
     [HttpGet("{id:int}")]
     public async Task<ActionResult<UsuarioDto>> GetById([FromRoute] int id)

@@ -1,5 +1,6 @@
 @page "/incidencias"
 @using FISEI.ServiceDesk.Web.Services
+@using Microsoft.AspNetCore.Components.Web
 @inject NavigationManager Nav
 @inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
 @inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
@@ -7,6 +8,8 @@
 @inject FISEI.ServiceDesk.Web.Services.PrioridadesService PriSvc
 @inject FISEI.ServiceDesk.Web.Services.EstadosService EstSvc
 @inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
+@inject FISEI.ServiceDesk.Web.Services.KnowledgeBaseService KbSvc
+@inject FISEI.ServiceDesk.Web.Services.UsuariosService UsuSvc
 @using System.Linq
 
 @code {
@@ -49,6 +52,18 @@
     private bool savingResolver = false;
     private int selectedEstadoResolverId = 3;
 
+    // Modal KB
+    private bool mostrarKbModal = false;
+    private bool savingKb = false;
+    private KbCrearDto kbForm = new();
+
+    // Modal Asignar Técnico
+    private bool mostrarAsignarTecnico = false;
+    private int? tecnicoSeleccionadoId = null;
+    private List<UsuarioSimpleDto> tecnicos = new();
+    private bool savingAsignacion = false;
+    private string? errorAsignacion = null;
+
     protected override async Task OnInitializedAsync()
     {
         try
@@ -82,11 +97,11 @@
         {
         if (EsAdmin || EsTecnico)
         {
-          items = await IncSvc.ListarTodasAsync(filtroTexto, filtroEstadoId, filtroPrioridadId);
+          items = await IncSvc.ListarTodasAsync(filtroTexto?.Trim(), filtroEstadoId, filtroPrioridadId);
         }
         else
         {
-          items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto, filtroEstadoId, filtroPrioridadId);
+          items = await IncSvc.ListarAsync(Auth.CurrentUserId!.Value, filtroTexto?.Trim(), filtroEstadoId, filtroPrioridadId);
         }
             await ResolverNombresFaltantes();
         }
@@ -102,6 +117,16 @@
       => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
     private bool EsEstudianteODocente
       => EsRol("ESTUDIANTE") || EsRol("DOCENTE") || EsRol("Estudiante") || EsRol("Docente");
+
+    private bool EsEstadoResuelto(int estadoId, string? estadoNombre)
+    {
+        if (!string.IsNullOrWhiteSpace(estadoNombre) && estadoNombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase)) return true;
+        var e = estados.FirstOrDefault(x => x.Id == estadoId);
+        var codigo = e?.Codigo ?? string.Empty;
+        var nombre = e?.Nombre ?? string.Empty;
+        return string.Equals(codigo, "RESUELTO", StringComparison.OrdinalIgnoreCase)
+               || (!string.IsNullOrWhiteSpace(nombre) && nombre.Contains("resuelto", StringComparison.OrdinalIgnoreCase));
+    }
 
     private async Task ResolverNombresFaltantes()
     {
@@ -183,6 +208,14 @@
     }
 
     private void CancelarNueva() => mostrarFormularioNueva = false;
+
+    private async Task HandleSearchKey(KeyboardEventArgs e)
+    {
+      if (string.Equals(e.Key, "Enter", StringComparison.OrdinalIgnoreCase))
+      {
+        await Cargar();
+      }
+    }
 
     // Modal Detalle
     private async Task AbrirDetalle(int id)
@@ -311,6 +344,95 @@
       }
       finally { savingResolver = false; }
     }
+
+    private void AbrirKbModal()
+    {
+      if (incDetalle is null) return;
+      var ahora = DateTime.UtcNow;
+      kbForm = new KbCrearDto
+      {
+        Titulo = incDetalle.Titulo,
+        Contenido = incDetalle.Descripcion,
+        Referencias = $"INC-{incDetalle.Id}",
+        Etiquetas = incDetalle.ServicioNombre,
+        ServicioId = incDetalle.ServicioId,
+        LaboratorioId = null,
+        AutorId = Auth.CurrentUserId!.Value,
+        IncidenciaOrigenId = incDetalle.Id,
+        FechaCreacion = ahora,
+        UltimaActualizacion = ahora
+      };
+      mostrarKbModal = true;
+    }
+
+    private void CerrarKbModal()
+    {
+      mostrarKbModal = false;
+      savingKb = false;
+    }
+
+    private async Task GuardarKb()
+    {
+      if (incDetalle is null) return;
+      savingKb = true; error = null;
+      try
+      {
+        await KbSvc.CrearDesdeIncidenciaAsync(incDetalle.Id, kbForm);
+        mostrarKbModal = false;
+        // Mostrar mensaje de éxito
+        error = null;
+      }
+      catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+      {
+        error = "Ya existe un artículo con este título en la base de conocimiento.";
+      }
+      catch (Exception ex)
+      {
+        error = ex.Message;
+      }
+      finally { savingKb = false; }
+    }
+
+    // Métodos de asignación de técnico
+    private async Task AbrirAsignarTecnicoModal()
+    {
+      try
+      {
+        tecnicos = await UsuSvc.ObtenerTecnicosAsync();
+        tecnicoSeleccionadoId = null;
+        errorAsignacion = null;
+        mostrarAsignarTecnico = true;
+      }
+      catch (Exception ex)
+      {
+        error = "Error cargando técnicos: " + ex.Message;
+      }
+    }
+
+    private void CerrarAsignarTecnicoModal()
+    {
+      mostrarAsignarTecnico = false;
+      tecnicoSeleccionadoId = null;
+      errorAsignacion = null;
+    }
+
+    private async Task ConfirmarAsignacion()
+    {
+      if (!tecnicoSeleccionadoId.HasValue || incDetalle is null) return;
+      savingAsignacion = true; errorAsignacion = null;
+      try
+      {
+        await IncSvc.AsignarTecnicoAsync(incDetalle.Id, tecnicoSeleccionadoId.Value, Auth.CurrentUserId!.Value);
+        mostrarAsignarTecnico = false;
+        // Recargar detalles
+        await AbrirDetalle(incDetalle.Id);
+      }
+      catch (Exception ex)
+      {
+        errorAsignacion = ex.Message;
+      }
+      finally { savingAsignacion = false; }
+    }
 }
 
 <RoleNav />
@@ -340,7 +462,7 @@
       <div class="filters-grid">
         <div class="form-group">
           <label><i class="fas fa-search"></i> Buscar</label>
-          <input class="form-control" placeholder="Título, descripción..." @bind="filtroTexto" />
+          <input class="form-control" placeholder="Título, descripción..." @bind="filtroTexto" @bind:event="oninput" @onkeydown="HandleSearchKey" />
         </div>
         <div class="form-group">
           <label><i class="fas fa-flag"></i> Estado</label>
@@ -516,7 +638,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-success" disabled="@saving" @onclick="GuardarNuevaIncidencia">
+            <button type="button" class="btn btn-primary" disabled="@saving" @onclick="GuardarNuevaIncidencia">
               <i class="fas fa-paper-plane"></i> @(saving ? "Guardando..." : "Crear Incidencia")
             </button>
             <button type="button" class="btn btn-secondary" @onclick="CancelarNueva">
@@ -595,6 +717,35 @@
                       </span>
                     </div>
 
+                    @if (incDetalle.TecnicoAsignadoId.HasValue && incDetalle.TecnicoAsignadoNombre != null)
+                    {
+                      <div class="info-row">
+                        <span class="info-label">Técnico asignado:</span>
+                        <span class="badge badge-info">
+                          <i class="fas fa-user-tie"></i> @incDetalle.TecnicoAsignadoNombre
+                        </span>
+                      </div>
+                    }
+                    else if (EsAdmin)
+                    {
+                      <div class="info-row">
+                        <span class="info-label">Asignar técnico:</span>
+                        <button class="btn btn-secondary" @onclick="AbrirAsignarTecnicoModal">
+                          <i class="fas fa-user-plus"></i> Asignar
+                        </button>
+                      </div>
+                    }
+
+                    @if (EsEstadoResuelto(incDetalle.EstadoId, incDetalle.EstadoNombre) && (EsAdmin || EsTecnico))
+                    {
+                      <div class="info-row">
+                        <span class="info-label">Base de conocimiento:</span>
+                        <button class="btn btn-primary" @onclick="AbrirKbModal">
+                          <i class="fas fa-book"></i> Agregar a la base
+                        </button>
+                      </div>
+                    }
+
                   </div>
                 </div>
 
@@ -667,10 +818,114 @@
             </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-success" disabled="@savingResolver" @onclick="ConfirmarResolver">
+            <button class="btn btn-primary" disabled="@savingResolver" @onclick="ConfirmarResolver">
               <i class="fas fa-check"></i> @(savingResolver ? "Resolviendo..." : "Resolver")
             </button>
             <button class="btn btn-secondary" @onclick="CerrarResolver">
+              <i class="fas fa-times"></i> Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @* Modal KB desde incidencia *@
+    @if (mostrarKbModal && incDetalle != null)
+    {
+      <div class="modal-overlay" @onclick="CerrarKbModal">
+        <div class="modal modal-large" @onclick:stopPropagation="true">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="fas fa-book"></i> Agregar a Base de Conocimiento</h5>
+            <button class="btn-close" @onclick="CerrarKbModal" title="Cerrar">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Título</label>
+                <input class="form-control" @bind="kbForm.Titulo" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Etiquetas (separadas por coma)</label>
+                <input class="form-control" @bind="kbForm.Etiquetas" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contenido</label>
+              <textarea class="form-control" rows="4" @bind="kbForm.Contenido"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Referencias</label>
+              <input class="form-control" @bind="kbForm.Referencias" />
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Servicio</label>
+                <InputSelect @bind-Value="kbForm.ServicioId" class="form-control">
+                  @foreach (var s in servicios)
+                  {
+                    <option value="@s.Id">@s.Nombre</option>
+                  }
+                </InputSelect>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Laboratorio (opcional)</label>
+                <InputSelect @bind-Value="kbForm.LaboratorioId" class="form-control">
+                  <option value="">Sin laboratorio</option>
+                  @foreach (var l in laboratorios)
+                  {
+                    <option value="@l.Id">@l.Nombre</option>
+                  }
+                </InputSelect>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" disabled="@savingKb" @onclick="GuardarKb">
+              <i class="fas fa-save"></i> @(savingKb ? "Guardando..." : "Guardar")
+            </button>
+            <button class="btn btn-secondary" @onclick="CerrarKbModal">
+              <i class="fas fa-times"></i> Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    @* Modal Asignar Técnico *@
+    @if (mostrarAsignarTecnico && incDetalle != null)
+    {
+      <div class="modal-overlay" @onclick="CerrarAsignarTecnicoModal">
+        <div class="modal" @onclick:stopPropagation="true">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="fas fa-user-plus"></i> Asignar Técnico</h5>
+            <button class="btn-close" @onclick="CerrarAsignarTecnicoModal" title="Cerrar">×</button>
+          </div>
+          <div class="modal-body">
+            @if (errorAsignacion != null)
+            {
+              <div class="alert alert-error">
+                <i class="fas fa-exclamation-triangle"></i> @errorAsignacion
+              </div>
+            }
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-user-tie"></i> Selecciona un técnico</label>
+              <InputSelect @bind-Value="tecnicoSeleccionadoId" class="form-control">
+                <option value="">-- Selecciona --</option>
+                @foreach (var t in tecnicos)
+                {
+                  <option value="@t.Id">@t.Nombre (@t.Correo)</option>
+                }
+              </InputSelect>
+            </div>
+            <p class="text-muted">
+              <i class="fas fa-info-circle"></i> El técnico recibirá una notificación sobre esta asignación.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" disabled="@(savingAsignacion || !tecnicoSeleccionadoId.HasValue)" @onclick="ConfirmarAsignacion">
+              <i class="fas fa-check"></i> @(savingAsignacion ? "Asignando..." : "Asignar")
+            </button>
+            <button class="btn btn-secondary" @onclick="CerrarAsignarTecnicoModal">
               <i class="fas fa-times"></i> Cancelar
             </button>
           </div>
@@ -1123,14 +1378,6 @@
   .form-label i {
     color: #8B0000;
     font-size: 0.85rem;
-  }
-  .btn-success {
-    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-    color: white;
-  }
-  .btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.4);
   }
   .btn-secondary {
     background: #6c757d;

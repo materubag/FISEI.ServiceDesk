@@ -205,5 +205,48 @@ public class IncidenciasController : ControllerBase
         return NoContent();
     }
 
+    // PATCH /api/incidencias/{id}/asignar
+    [HttpPatch("{id:int}/asignar")]
+    public async Task<ActionResult> AsignarTecnico([FromRoute] int id, [FromBody] AsignarTecnicoDto dto)
+    {
+        var inc = await _db.Incidencias.FindAsync(id);
+        if (inc is null || !inc.Activo) return NotFound();
+
+        // Verificar que el técnico existe y tiene RolId = 2
+        var tecnico = await _db.Usuarios.FindAsync(dto.TecnicoId);
+        if (tecnico is null || tecnico.RolId != 2)
+            return BadRequest("El usuario especificado no es un técnico válido.");
+
+        inc.TecnicoAsignadoId = dto.TecnicoId;
+        inc.FechaUltimoCambio = DateTime.UtcNow;
+
+        // Registrar en seguimiento
+        _db.Seguimientos.Add(new Seguimiento
+        {
+            IncidenciaId = inc.Id,
+            UsuarioId = dto.AsignadoPorId,
+            EstadoAnteriorId = inc.EstadoId,
+            EstadoNuevoId = inc.EstadoId,
+            Comentario = $"Incidencia asignada a {tecnico.Nombre}"
+        });
+
+        // Notificar al técnico asignado
+        var refCodigo = $"INC-{inc.Id:000000}";
+        _db.Notificaciones.Add(new Notificacion
+        {
+            UsuarioDestinoId = dto.TecnicoId,
+            Tipo = "ASIGNACION",
+            Referencia = refCodigo,
+            Mensaje = $"Se te ha asignado la incidencia {refCodigo}: {inc.Titulo}"
+        });
+
+        await _db.SaveChangesAsync();
+        await _notifier.NotifyUserAsync(dto.TecnicoId, $"Nueva asignación: {refCodigo}");
+
+        return NoContent();
+    }
+
+    public record AsignarTecnicoDto(int TecnicoId, int AsignadoPorId);
+
     // Importante: eliminamos el POST de comentarios aquí para evitar duplicidad de rutas
 }
