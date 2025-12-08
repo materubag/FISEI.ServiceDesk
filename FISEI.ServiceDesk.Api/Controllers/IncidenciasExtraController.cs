@@ -24,7 +24,8 @@ public class IncidenciasExtraController : ControllerBase
         if (estadoId.HasValue) q = q.Where(i => i.EstadoId == estadoId.Value);
         if (prioridadId.HasValue) q = q.Where(i => i.PrioridadId == prioridadId.Value);
         if (servicioId.HasValue) q = q.Where(i => i.ServicioId == servicioId.Value);
-        if (!string.IsNullOrWhiteSpace(search)) q = q.Where(i => i.Titulo.Contains(search) || i.Descripcion.Contains(search));
+        if (!string.IsNullOrWhiteSpace(search)) 
+            q = q.Where(i => EF.Functions.Like(i.Titulo, $"%{search}%") || EF.Functions.Like(i.Descripcion, $"%{search}%"));
 
         var list = await q
             .OrderByDescending(i => i.Id)
@@ -54,6 +55,16 @@ public class IncidenciasExtraController : ControllerBase
     {
         var i = await _db.Incidencias.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.Activo);
         if (i is null) return NotFound();
+
+        string? tecnicoNombre = null;
+        if (i.TecnicoAsignadoId.HasValue)
+        {
+            tecnicoNombre = await _db.Usuarios
+                .Where(u => u.Id == i.TecnicoAsignadoId.Value)
+                .Select(u => u.Nombre)
+                .FirstOrDefaultAsync();
+        }
+
         return Ok(new
         {
             i.Id,
@@ -65,6 +76,7 @@ public class IncidenciasExtraController : ControllerBase
             i.ServicioId,
             i.CreadorId,
             i.TecnicoAsignadoId,
+            TecnicoAsignadoNombre = tecnicoNombre,
             i.FechaCreacion,
             i.FechaUltimoCambio,
             i.FechaResolucion,

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -24,6 +25,19 @@ public class UsuariosService
         var resp = await _http.PostAsJsonAsync($"/api/usuarios/{dto.UsuarioId}/password", dto);
         resp.EnsureSuccessStatusCode();
     }
+
+    public async Task<List<UsuarioSimpleDto>> ObtenerTecnicosAsync()
+    {
+        try
+        {
+            var result = await _http.GetFromJsonAsync<List<UsuarioSimpleDto>>("/api/usuarios/tecnicos");
+            return result ?? new List<UsuarioSimpleDto>();
+        }
+        catch
+        {
+            return new List<UsuarioSimpleDto>();
+        }
+    }
 }
 
 public class UsuarioPerfilDto
@@ -40,4 +54,14 @@ public class CambiarPasswordDto
     public string PasswordActual { get; set; } = "";
     public string PasswordNueva { get; set; } = "";
     public string PasswordNuevaConfirmacion { get; set; } = "";
+}
+
+public class UsuarioSimpleDto
+{
+    public int Id { get; set; }
+    public string Nombre { get; set; } = "";
+    public string Correo { get; set; } = "";
+    public int RolId { get; set; }
+    public bool Activo { get; set; }
+    public DateTime FechaRegistro { get; set; }
 }

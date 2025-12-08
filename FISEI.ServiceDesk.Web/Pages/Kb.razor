@@ -6,6 +6,7 @@
 @inject FISEI.ServiceDesk.Web.Services.ServiciosService ServSvc
 @inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
 @inject FISEI.ServiceDesk.Web.Services.CategoriasService CatSvc
+@inject FISEI.ServiceDesk.Web.Services.IncidenciasService IncSvc
 
 @code {
     private const int PageSize = 20;
@@ -25,6 +26,22 @@
     private Dictionary<int,string> mapLabs = new();
 
     private PagedResult<KbArticuloResumenDto> result = new() { Items = new(), Total = 0, Page = 1, PageSize = PageSize };
+
+    // Modal Artículo
+    private bool mostrarArticulo = false;
+    private bool loadingArticulo = false;
+    private KbArticuloDto? articuloDetalle;
+    private string? articuloServicioNombre;
+    private string? articuloLaboratorioNombre;
+    private string? articuloAutorNombre;
+    private bool editandoArticulo = false;
+    private bool savingArticulo = false;
+    private KbArticuloDto? articuloEditForm;
+
+    // Modal Incidencia
+    private bool mostrarIncidencia = false;
+    private bool loadingIncidencia = false;
+    private IncidenciaDetalleDto? incidenciaDetalle;
 
     protected override async Task OnInitializedAsync()
     {
@@ -73,6 +90,105 @@
     private bool CanNext => result.Page < TotalPages;
     private Task Prev() => Buscar(result.Page - 1);
     private Task Next() => Buscar(result.Page + 1);
+
+    private async Task AbrirArticuloModal(int id)
+    {
+      loadingArticulo = true; error = null;
+      try
+      {
+        articuloDetalle = await KbSvc.ObtenerAsync(id);
+        if (articuloDetalle != null)
+        {
+          articuloServicioNombre = articuloDetalle.ServicioNombre ?? (articuloDetalle.ServicioId.HasValue ? (await ServSvc.ObtenerAsync(articuloDetalle.ServicioId.Value))?.Nombre : null);
+          articuloLaboratorioNombre = articuloDetalle.LaboratorioNombre ?? (articuloDetalle.LaboratorioId.HasValue ? (await LabSvc.ObtenerAsync(articuloDetalle.LaboratorioId.Value))?.Nombre : null);
+          articuloAutorNombre = articuloDetalle.AutorNombre;
+        }
+        mostrarArticulo = true;
+      }
+      catch (Exception ex) { error = ex.Message; }
+      finally { loadingArticulo = false; }
+    }
+
+    private void CerrarArticuloModal()
+    {
+        mostrarArticulo = false;
+        articuloDetalle = null;
+        articuloServicioNombre = articuloLaboratorioNombre = articuloAutorNombre = null;
+        loadingArticulo = false;
+        editandoArticulo = false;
+        articuloEditForm = null;
+    }
+
+    private bool EsRol(string r)
+      => string.Equals(Auth.CurrentUserRole, r, StringComparison.OrdinalIgnoreCase);
+    private bool EsAdmin
+      => EsRol("ADMINISTRADOR") || EsRol("ADMIN") || EsRol("Administrador") || EsRol("Admin");
+    private bool EsTecnico
+      => EsRol("TECNICO") || EsRol("TÉCNICO") || EsRol("Tecnico") || EsRol("Técnico");
+
+    private void AbrirEdicionArticulo()
+    {
+      if (articuloDetalle is null) return;
+      articuloEditForm = new KbArticuloDto
+      {
+        Id = articuloDetalle.Id,
+        Titulo = articuloDetalle.Titulo,
+        Contenido = articuloDetalle.Contenido,
+        Referencias = articuloDetalle.Referencias,
+        Etiquetas = articuloDetalle.Etiquetas,
+        ServicioId = articuloDetalle.ServicioId,
+        LaboratorioId = articuloDetalle.LaboratorioId
+      };
+      editandoArticulo = true;
+    }
+
+    private void CancelarEdicion()
+    {
+      editandoArticulo = false;
+      articuloEditForm = null;
+    }
+
+    private async Task GuardarArticulo()
+    {
+      if (articuloEditForm is null) return;
+      savingArticulo = true;
+      error = null;
+      try
+      {
+        await KbSvc.ActualizarAsync(articuloEditForm.Id, articuloEditForm);
+        articuloDetalle!.Titulo = articuloEditForm.Titulo;
+        articuloDetalle!.Contenido = articuloEditForm.Contenido;
+        articuloDetalle!.Referencias = articuloEditForm.Referencias;
+        articuloDetalle!.Etiquetas = articuloEditForm.Etiquetas;
+        articuloDetalle!.ServicioId = articuloEditForm.ServicioId;
+        articuloDetalle!.LaboratorioId = articuloEditForm.LaboratorioId;
+        editandoArticulo = false;
+        articuloEditForm = null;
+      }
+      catch (Exception ex)
+      {
+        error = ex.Message;
+      }
+      finally { savingArticulo = false; }
+    }
+    private async Task AbrirIncidenciaModal(int id)
+    {
+      loadingIncidencia = true; error = null;
+      try
+      {
+        incidenciaDetalle = await IncSvc.ObtenerDetalleAsync(id);
+        mostrarIncidencia = true;
+      }
+      catch (Exception ex) { error = ex.Message; }
+      finally { loadingIncidencia = false; }
+    }
+
+    private void CerrarIncidenciaModal()
+    {
+      mostrarIncidencia = false;
+      incidenciaDetalle = null;
+      loadingIncidencia = false;
+    }
 }
 
 <RoleNav />
@@ -215,14 +331,14 @@
               }
 
               <div class="article-actions">
-                <a class="btn btn-primary" href="@($"/kb/{a.Id}")">
+                <button class="btn btn-primary" @onclick="() => AbrirArticuloModal(a.Id)">
                   <i class="fas fa-book-open"></i> Ver artículo
-                </a>
+                </button>
                 @if (a.IncidenciaOrigenId.HasValue)
                 {
-                  <a class="btn btn-secondary" href="@($"/incidencia/{a.IncidenciaOrigenId.Value}")">
+                  <button class="btn btn-secondary" @onclick="() => AbrirIncidenciaModal(a.IncidenciaOrigenId.Value)">
                     <i class="fas fa-ticket-alt"></i> Ver incidencia
-                  </a>
+                  </button>
                 }
               </div>
             </article>
@@ -244,6 +360,208 @@
     }
   </section>
 </main>
+
+@* Modal Artículo *@
+@if (mostrarArticulo)
+{
+  <div class="modal-overlay" @onclick="CerrarArticuloModal">
+    <div class="modal modal-xl" @onclick:stopPropagation="true">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-book-open"></i> Artículo KB</h5>
+        <button class="btn-close" @onclick="CerrarArticuloModal" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        @if (loadingArticulo)
+        {
+          <div class="loading-container-small"><div class="spinner-small"></div><p class="muted">Cargando artículo...</p></div>
+        }
+        else if (articuloDetalle is null)
+        {
+          <p class="muted">No se pudo cargar el artículo.</p>
+        }
+        else if (!editandoArticulo)
+        {
+          <div class="detalle-grid">
+            <div class="detalle-section">
+              <h4><i class="fas fa-info-circle"></i> Información</h4>
+              <div class="detalle-info">
+                <div class="info-row"><span class="info-label">Título:</span><span class="info-value fw-medium">@articuloDetalle.Titulo</span></div>
+                <div class="info-row"><span class="info-label">Servicio:</span><span class="badge badge-category"><i class="fas fa-wrench"></i> @(articuloServicioNombre ?? NombreServicio(articuloDetalle.ServicioId))</span></div>
+                <div class="info-row"><span class="info-label">Laboratorio:</span><span class="badge badge-info"><i class="fas fa-building"></i> @(articuloLaboratorioNombre ?? NombreLab(articuloDetalle.LaboratorioId))</span></div>
+                <div class="info-row"><span class="info-label">Autor:</span><span class="info-value">@(articuloAutorNombre ?? $"#{articuloDetalle.AutorId}")</span></div>
+                <div class="info-row"><span class="info-label">Creado:</span><span class="info-value">@articuloDetalle.FechaCreacion.ToLocalTime()</span></div>
+                <div class="info-row"><span class="info-label">Actualizado:</span><span class="info-value">@articuloDetalle.UltimaActualizacion.ToLocalTime()</span></div>
+              </div>
+            </div>
+            <div class="detalle-section">
+              <h4><i class="fas fa-tags"></i> Etiquetas y referencias</h4>
+              @if (!string.IsNullOrWhiteSpace(articuloDetalle.Etiquetas))
+              {
+                <div class="article-tags">
+                  @foreach (var tag in SplitTags(articuloDetalle.Etiquetas))
+                  {
+                    <span class="tag">#@tag</span>
+                  }
+                </div>
+              }
+              else
+              {
+                <p class="muted">Sin etiquetas</p>
+              }
+
+              @if (!string.IsNullOrWhiteSpace(articuloDetalle.Referencias))
+              {
+                <div class="article-references">
+                  <span class="references-label"><i class="fas fa-link"></i> Referencias:</span>
+                  @foreach (var r in SplitRefs(articuloDetalle.Referencias))
+                  {
+                    var url = r.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? r : $"https://{r}";
+                    <a href="@url" target="_blank" class="reference-link">@r</a>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          <div class="detalle-section" style="margin-top:1rem">
+            <h4><i class="fas fa-align-left"></i> Contenido</h4>
+            @if (!string.IsNullOrWhiteSpace(articuloDetalle.ContenidoHtml))
+            {
+              @((MarkupString)articuloDetalle.ContenidoHtml)
+            }
+            else
+            {
+              <pre style="white-space:pre-wrap">@articuloDetalle.Contenido</pre>
+            }
+          </div>
+        }
+        else if (editandoArticulo && articuloEditForm is not null)
+        {
+          @if (!string.IsNullOrEmpty(error)) { <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> @error</div> }
+          <div class="form-group">
+            <label class="form-label"><i class="fas fa-heading"></i> Título</label>
+            <input class="form-control" @bind="articuloEditForm.Titulo" placeholder="Título del artículo" />
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-wrench"></i> Servicio</label>
+              <InputSelect @bind-Value="articuloEditForm.ServicioId" class="form-control">
+                <option value="">Sin servicio</option>
+                @foreach (var s in servicios)
+                {
+                  <option value="@s.Id">@s.Nombre</option>
+                }
+              </InputSelect>
+            </div>
+            <div class="form-group">
+              <label class="form-label"><i class="fas fa-building"></i> Laboratorio</label>
+              <InputSelect @bind-Value="articuloEditForm.LaboratorioId" class="form-control">
+                <option value="">Sin laboratorio</option>
+                @foreach (var l in laboratorios)
+                {
+                  <option value="@l.Id">@l.Nombre</option>
+                }
+              </InputSelect>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fas fa-align-left"></i> Contenido</label>
+            <textarea class="form-control" rows="6" @bind="articuloEditForm.Contenido" placeholder="Describe la solución aquí..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fas fa-tags"></i> Etiquetas (separadas por coma)</label>
+            <input class="form-control" @bind="articuloEditForm.Etiquetas" placeholder="ej: error, solución, web" />
+          </div>
+          <div class="form-group">
+            <label class="form-label"><i class="fas fa-link"></i> Referencias</label>
+            <textarea class="form-control" rows="3" @bind="articuloEditForm.Referencias" placeholder="Enlaces o referencias relacionadas (uno por línea)"></textarea>
+          </div>
+        }
+      </div>
+      @if (!editandoArticulo && (EsAdmin || EsTecnico))
+      {
+        <div class="modal-footer">
+          <button class="btn btn-primary" @onclick="AbrirEdicionArticulo">
+            <i class="fas fa-edit"></i> Editar
+          </button>
+          <button class="btn btn-secondary" @onclick="CerrarArticuloModal">Cerrar</button>
+        </div>
+      }
+      @if (editandoArticulo && articuloEditForm is not null)
+      {
+        <div class="modal-footer">
+          <button class="btn btn-primary" disabled="@savingArticulo" @onclick="GuardarArticulo">
+            <i class="fas fa-save"></i> @(savingArticulo ? "Guardando..." : "Guardar")
+          </button>
+          <button class="btn btn-secondary" @onclick="CancelarEdicion">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+}
+
+@* Modal Incidencia *@
+@if (mostrarIncidencia)
+{
+  <div class="modal-overlay" @onclick="CerrarIncidenciaModal">
+    <div class="modal modal-xl" @onclick:stopPropagation="true">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-ticket-alt"></i> Incidencia</h5>
+        <button class="btn-close" @onclick="CerrarIncidenciaModal" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        @if (loadingIncidencia)
+        {
+          <div class="loading-container-small"><div class="spinner-small"></div><p class="muted">Cargando incidencia...</p></div>
+        }
+        else if (incidenciaDetalle is null)
+        {
+          <p class="muted">No se pudo cargar la incidencia.</p>
+        }
+        else
+        {
+          <div class="detalle-grid">
+            <div class="detalle-section">
+              <h4><i class="fas fa-info-circle"></i> Información</h4>
+              <div class="detalle-info">
+                <div class="info-row"><span class="info-label">Título:</span><span class="info-value fw-medium">@incidenciaDetalle.Titulo</span></div>
+                <div class="info-row"><span class="info-label">Descripción:</span><span class="info-value">@incidenciaDetalle.Descripcion</span></div>
+                <div class="info-row"><span class="info-label">Servicio:</span><span class="badge badge-category"><i class="fas fa-wrench"></i> @incidenciaDetalle.ServicioNombre</span></div>
+                <div class="info-row"><span class="info-label">Prioridad:</span><span class="badge badge-warning"><i class="fas fa-exclamation-circle"></i> @incidenciaDetalle.PrioridadNombre</span></div>
+                <div class="info-row"><span class="info-label">Estado:</span><span class="badge badge-info"><i class="fas fa-flag"></i> @incidenciaDetalle.EstadoNombre</span></div>
+              </div>
+            </div>
+            <div class="detalle-section">
+              <h4><i class="fas fa-comments"></i> Comentarios (@(incidenciaDetalle.Comentarios?.Count ?? 0))</h4>
+              @if (incidenciaDetalle.Comentarios?.Count > 0)
+              {
+                <div class="comentarios-list">
+                  @foreach (var c in incidenciaDetalle.Comentarios)
+                  {
+                    <div class="comentario-item @(c.EsInterno ? "comentario-interno" : "")">
+                      <div class="comentario-header">
+                        <span class="comentario-autor"><i class="fas fa-user-circle"></i> @c.AutorNombre</span>
+                        <span class="comentario-fecha text-muted">@c.Fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                        @if (c.EsInterno) { <span class="badge badge-warning"><i class="fas fa-lock"></i> Interno</span>; }
+                      </div>
+                      <div class="comentario-texto">@c.Texto</div>
+                    </div>
+                  }
+                </div>
+              }
+              else
+              {
+                <p class="muted">No hay comentarios aún</p>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}
 
 <style>
   /* Page Header */
@@ -476,6 +794,59 @@
     cursor: not-allowed;
   }
 
+  /* Modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s;
+  }
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    animation: slideUp 0.3s;
+  }
+  .modal-xl { max-width: 1000px; }
+  .modal-header {
+    padding: 1.2rem 1.5rem;
+    background: linear-gradient(135deg, #8B0000 0%, #5c0000 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .modal-title { margin: 0; font-size: 1.2rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+  .btn-close { background: rgba(255,255,255,0.2); border: none; color: white; width: 32px; height: 32px; border-radius: 6px; font-size: 1.5rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .btn-close:hover { background: rgba(255,255,255,0.3); }
+  .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+
+  .detalle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .detalle-section { display: flex; flex-direction: column; gap: 0.75rem; }
+  .detalle-section h4 { margin: 0; font-size: 1.05rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.35rem; color: #2c3e50; display: flex; gap: 0.5rem; align-items: center; }
+  .detalle-info { display: flex; flex-direction: column; gap: 0.6rem; }
+  .info-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .info-label { width: 120px; font-weight: 600; color: #495057; }
+  .info-value { color: #212529; }
+  .comentarios-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .comentario-item { background: #f8f9fa; padding: 0.75rem; border-radius: 8px; border: 1px solid #e9ecef; }
+  .comentario-interno { border-color: #f6c343; background: #fff8e1; }
+  .comentario-header { display: flex; gap: 0.5rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .comentario-texto { margin-top: 0.35rem; white-space: pre-wrap; }
+  .loading-container-small { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1rem; }
+  .spinner-small { width: 32px; height: 32px; border: 3px solid #e9ecef; border-top-color: #8B0000; border-radius: 50%; animation: spin 1s linear infinite; }
+
   /* Pagination */
   .pagination {
     display: flex;
@@ -550,6 +921,59 @@
   .text-muted {
     color: #6c757d;
   }
+  .muted {
+    color: #6c757d;
+  }
+
+  /* Form Styles */
+  .form-control {
+    padding: 0.75rem;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s;
+  }
+  .form-control:focus {
+    outline: none;
+    border-color: #8B0000;
+    box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .form-label {
+    font-weight: 500;
+    color: #495057;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .form-label i {
+    color: #8B0000;
+    font-size: 0.9rem;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+  .alert {
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+  .alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #c62828;
+  }
 
   /* Responsive */
   @@media (max-width: 768px) {
@@ -570,5 +994,11 @@
     .pagination {
       flex-wrap: wrap;
     }
+    .modal { max-width: 95%; }
+    .detalle-grid { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
   }
+
+  @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
