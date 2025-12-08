@@ -3,6 +3,8 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using FISEI.ServiceDesk.Web.Shared
 
+@inject FISEI.ServiceDesk.Web.Services.AuthClientService Auth
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
@@ -17,14 +19,13 @@
 </CascadingAuthenticationState>
 
 @code {
-    // Si no tienes un servicio global, puedes inyectarlo:
-    // [Inject] AuthClientService AuthSvc { get; set; } = default!;
+    protected override async Task OnInitializedAsync()
+    {
+        await Auth.EnsureInitializedAsync();
+    }
 }
 
-// Componente auxiliar para redirigir
+
 @code {
-    public static class AuthClientServiceStatic {
-        // Puedes sincronizar este valor en el login; alternativa: usar servicio real inyectado.
-        public static bool IsAuthenticated { get; set; }
-    }
+    public static class AuthClientServiceStatic { public static bool IsAuthenticated { get; set; } }
 }

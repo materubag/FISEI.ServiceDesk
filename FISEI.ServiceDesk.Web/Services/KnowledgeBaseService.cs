@@ -34,6 +34,26 @@ public class KnowledgeBaseService
         resp.EnsureSuccessStatusCode();
     }
 
+    public async Task ActualizarAsync(int id, KbArticuloDto dto)
+    {
+        var updateDto = new { dto.Titulo, dto.Contenido, dto.Referencias, dto.Etiquetas, dto.ServicioId, dto.LaboratorioId };
+        var resp = await _http.PutAsJsonAsync($"/api/kb/{id}", updateDto);
+        resp.EnsureSuccessStatusCode();
+    }
+
+    // Crear artículo (vinculado a incidencia)
+    public async Task<int> CrearDesdeIncidenciaAsync(int incidenciaId, KbCrearDto dto)
+    {
+        var resp = await _http.PostAsJsonAsync($"/api/incidencias/{incidenciaId}/kb", dto);
+        if (resp.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new HttpRequestException("Ya existe un artículo con este título.", null, HttpStatusCode.Conflict);
+        }
+        resp.EnsureSuccessStatusCode();
+        var creado = await resp.Content.ReadFromJsonAsync<KbArticuloDto>();
+        return creado?.Id ?? 0;
+    }
+
     // Lista/búsqueda (robusto a objeto paginado o array simple)
     public async Task<PagedResult<KbArticuloResumenDto>> BuscarAsync(
         string? query, int? servicioId, int? laboratorioId, int? autorId, int page, int pageSize)
@@ -122,6 +142,20 @@ public class KbArticuloDto
 
     public int Votos { get; set; }
     public double PromedioVotos { get; set; }
+}
+
+public class KbCrearDto
+{
+    public string Titulo { get; set; } = "";
+    public string Contenido { get; set; } = "";
+    public string? Referencias { get; set; }
+    public string? Etiquetas { get; set; }
+    public int? ServicioId { get; set; }
+    public int? LaboratorioId { get; set; }
+    public int AutorId { get; set; }
+    public int? IncidenciaOrigenId { get; set; }
+    public DateTime FechaCreacion { get; set; }
+    public DateTime UltimaActualizacion { get; set; }
 }
 
 public class KbFeedbackCrearDto

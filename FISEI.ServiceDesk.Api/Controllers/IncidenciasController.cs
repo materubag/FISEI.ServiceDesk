@@ -1,5 +1,4 @@
 using FISEI.ServiceDesk.Api.Services;
-using FISEI.ServiceDesk.Application.DTOs.Comentarios;
 using FISEI.ServiceDesk.Application.DTOs.Incidencias;
 using FISEI.ServiceDesk.Domain.Entities;
 using FISEI.ServiceDesk.Infrastructure.Persistence;
@@ -25,7 +24,6 @@ public class IncidenciasController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<IncidenciaDto>> Crear([FromBody] CreateIncidenciaDto dto)
     {
-        // Validaciones mínimas
         if (!await _db.Usuarios.AnyAsync(u => u.Id == dto.CreadorId))
             return BadRequest("CreadorId no existe.");
 
@@ -35,7 +33,6 @@ public class IncidenciasController : ControllerBase
             .FirstOrDefaultAsync();
         if (estadoReportadoId == 0)
         {
-            // Fallback a "ABIERTO" si no existe REPORTADO en catálogo
             estadoReportadoId = await _db.EstadosIncidencia
                 .Where(e => e.Codigo == "ABIERTO")
                 .Select(e => e.Id)
@@ -62,7 +59,6 @@ public class IncidenciasController : ControllerBase
         }
         await _db.SaveChangesAsync();
 
-        // Seguimiento inicial
         _db.Seguimientos.Add(new Seguimiento
         {
             IncidenciaId = entity.Id,
@@ -72,7 +68,6 @@ public class IncidenciasController : ControllerBase
             Comentario = "Incidencia creada"
         });
 
-        // SLA (usa definición por prioridad — puedes añadir filtrado por servicio si hay reglas específicas)
         var slaDef = await _db.SLA_Definiciones
             .Where(d => d.Activo && d.PrioridadId == entity.PrioridadId)
             .OrderByDescending(d => d.Id)
@@ -92,7 +87,6 @@ public class IncidenciasController : ControllerBase
             });
         }
 
-        // Notificaciones a técnicos y administradores
         var tecnicosYAdmins = await _db.Usuarios
             .Where(u => u.RolId == 2 || u.RolId == 3)
             .Select(u => u.Id)
@@ -166,8 +160,10 @@ public class IncidenciasController : ControllerBase
         inc.CambiarEstado(dto.NuevoEstadoId);
         inc.FechaUltimoCambio = DateTime.UtcNow;
 
-        // Si pasa a RESUELTO registrar FechaResolucion
-        var estadoResueltoId = await _db.EstadosIncidencia.Where(e => e.Codigo == "RESUELTO").Select(e => e.Id).FirstAsync();
+        var estadoResueltoId = await _db.EstadosIncidencia
+            .Where(e => e.Codigo == "RESUELTO")
+            .Select(e => e.Id)
+            .FirstAsync();
         if (dto.NuevoEstadoId == estadoResueltoId)
             inc.FechaResolucion = DateTime.UtcNow;
 
@@ -179,6 +175,20 @@ public class IncidenciasController : ControllerBase
             EstadoNuevoId = dto.NuevoEstadoId,
             Comentario = dto.Comentario
         });
+
+        // También registrar el comentario en la tabla ComentariosIncidencia si viene texto
+        if (!string.IsNullOrWhiteSpace(dto.Comentario))
+        {
+            _db.ComentariosIncidencia.Add(new FISEI.ServiceDesk.Domain.Entities.ComentarioIncidencia
+            {
+                IncidenciaId = inc.Id,
+                UsuarioId = dto.ActorId,
+                Texto = dto.Comentario,
+                // Si el DTO no tiene EsInterno, asumimos público (false)
+                EsInterno = false,
+                Fecha = DateTime.UtcNow
+            });
+        }
 
         var refCodigo = $"INC-{inc.Id:000000}";
         _db.Notificaciones.Add(new Notificacion
@@ -195,57 +205,48 @@ public class IncidenciasController : ControllerBase
         return NoContent();
     }
 
-    // POST /api/incidencias/{id}/comentarios
-    [HttpPost("{id:int}/comentarios")]
-    public async Task<ActionResult> AgregarComentario([FromRoute] int id, [FromBody] CreateComentarioDto dto)
+    // PATCH /api/incidencias/{id}/asignar
+    [HttpPatch("{id:int}/asignar")]
+    public async Task<ActionResult> AsignarTecnico([FromRoute] int id, [FromBody] AsignarTecnicoDto dto)
     {
         var inc = await _db.Incidencias.FindAsync(id);
         if (inc is null || !inc.Activo) return NotFound();
 
-        _db.ComentariosIncidencia.Add(new FISEI.ServiceDesk.Domain.Entities.ComentarioIncidencia
+        // Verificar que el técnico existe y tiene RolId = 2
+        var tecnico = await _db.Usuarios.FindAsync(dto.TecnicoId);
+        if (tecnico is null || tecnico.RolId != 2)
+            return BadRequest("El usuario especificado no es un técnico válido.");
+
+        inc.TecnicoAsignadoId = dto.TecnicoId;
+        inc.FechaUltimoCambio = DateTime.UtcNow;
+
+        // Registrar en seguimiento
+        _db.Seguimientos.Add(new Seguimiento
         {
-            IncidenciaId = id,
-            UsuarioId = dto.UsuarioId,
-            Texto = dto.Texto,
-            EsInterno = dto.EsInterno
+            IncidenciaId = inc.Id,
+            UsuarioId = dto.AsignadoPorId,
+            EstadoAnteriorId = inc.EstadoId,
+            EstadoNuevoId = inc.EstadoId,
+            Comentario = $"Incidencia asignada a {tecnico.Nombre}"
         });
 
-        var refCodigo = $"INC-{id:000000}";
-        var actor = await _db.Usuarios
-            .Where(u => u.Id == dto.UsuarioId)
-            .Select(u => new { u.Id, u.RolId })
-            .FirstOrDefaultAsync();
-
-        if (actor != null)
+        // Notificar al técnico asignado
+        var refCodigo = $"INC-{inc.Id:000000}";
+        _db.Notificaciones.Add(new Notificacion
         {
-            if (actor.RolId == 2 || actor.RolId == 3) // Técnico/Admin comenta → notifica al creador
-            {
-                _db.Notificaciones.Add(new Notificacion
-                {
-                    UsuarioDestinoId = inc.CreadorId,
-                    Tipo = "NUEVO_COMENTARIO",
-                    Referencia = refCodigo,
-                    Mensaje = $"Nuevo comentario en {refCodigo}"
-                });
-            }
-            else // Estudiante comenta → notifica al técnico asignado (si existe)
-            {
-                if (inc.TecnicoAsignadoId.HasValue)
-                {
-                    _db.Notificaciones.Add(new Notificacion
-                    {
-                        UsuarioDestinoId = inc.TecnicoAsignadoId.Value,
-                        Tipo = "NUEVO_COMENTARIO",
-                        Referencia = refCodigo,
-                        Mensaje = $"Nuevo comentario en {refCodigo}"
-                    });
-                }
-            }
-        }
+            UsuarioDestinoId = dto.TecnicoId,
+            Tipo = "ASIGNACION",
+            Referencia = refCodigo,
+            Mensaje = $"Se te ha asignado la incidencia {refCodigo}: {inc.Titulo}"
+        });
 
         await _db.SaveChangesAsync();
-        await _notifier.NotifyAllAsync($"Nuevo comentario en {refCodigo}");
+        await _notifier.NotifyUserAsync(dto.TecnicoId, $"Nueva asignación: {refCodigo}");
 
         return NoContent();
     }
+
+    public record AsignarTecnicoDto(int TecnicoId, int AsignadoPorId);
+
+    // Importante: eliminamos el POST de comentarios aquí para evitar duplicidad de rutas
 }

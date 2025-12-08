@@ -27,10 +27,7 @@ public class KnowledgeBaseController : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
-            q = q.Where(a =>
-                a.Titulo.Contains(s) ||
-                a.Contenido.Contains(s) ||
-                (a.Etiquetas != null && a.Etiquetas.Contains(s)));
+            q = q.Where(a => EF.Functions.Like(a.Titulo, $"%{s}%"));
         }
         if (servicioId.HasValue) q = q.Where(a => a.ServicioId == servicioId.Value);
         if (laboratorioId.HasValue) q = q.Where(a => a.LaboratorioId == laboratorioId.Value);
@@ -75,6 +72,14 @@ public class KnowledgeBaseController : ControllerBase
         var inc = await _db.Incidencias.AsNoTracking().FirstOrDefaultAsync(i => i.Id == incidenciaId);
         if (inc is null) return NotFound("Incidencia no existe.");
 
+        // Verificar si ya existe un artículo con el mismo título (case-insensitive)
+        var existe = await _db.ArticulosConocimiento
+            .AsNoTracking()
+            .AnyAsync(a => a.Activo && EF.Functions.Like(a.Titulo, dto.Titulo));
+        
+        if (existe)
+            return Conflict(new { error = "Ya existe un artículo con este título en la base de conocimiento." });
+
         dto.Id = 0;
         dto.IncidenciaOrigenId = incidenciaId;
         dto.ServicioId ??= inc.ServicioId;
@@ -92,7 +97,7 @@ public class KnowledgeBaseController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] ArticuloConocimiento dto)
+    public async Task<IActionResult> Update(int id, [FromBody] ArticuloUpdateDto dto)
     {
         var a = await _db.ArticulosConocimiento.FindAsync(id);
         if (a is null) return NotFound();
@@ -103,12 +108,20 @@ public class KnowledgeBaseController : ControllerBase
         a.Etiquetas = dto.Etiquetas;
         a.ServicioId = dto.ServicioId;
         a.LaboratorioId = dto.LaboratorioId;
-        a.AutorId = dto.AutorId;
-        a.Activo = dto.Activo;
         a.UltimaActualizacion = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
         return NoContent();
+    }
+
+    public class ArticuloUpdateDto
+    {
+        public string Titulo { get; set; } = "";
+        public string Contenido { get; set; } = "";
+        public string? Referencias { get; set; }
+        public string? Etiquetas { get; set; }
+        public int? ServicioId { get; set; }
+        public int? LaboratorioId { get; set; }
     }
 
     [HttpDelete("{id:int}")]

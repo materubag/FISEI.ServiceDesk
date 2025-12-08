@@ -30,7 +30,14 @@
     private void OnLogoutClicked()
     {
         Auth.Logout();
-        Nav.NavigateTo("/login", true);
+        try
+        {
+            Nav.NavigateTo("/login", true);
+        }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+            // Swallow navigation exception triggered by NavigateTo to avoid error UI.
+        }
     }
 }
 
