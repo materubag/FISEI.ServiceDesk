@@ -21,6 +21,7 @@ builder.Services.AddScoped<ProtectedLocalStorage>();
 
 builder.Services.AddScoped<AuthClientService>();
 builder.Services.AddScoped<AuthHeaderHandler>();
+builder.Services.AddScoped<ToastService>();
 
 // Cliente para AUTH (sin handler)
 builder.Services.AddHttpClient("Auth", client =>

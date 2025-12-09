@@ -1,0 +1,227 @@
+@implements IAsyncDisposable
+@inject ToastService Toast
+
+<div class="toast-container">
+    @foreach (var message in messages)
+    {
+        <div class="toast @GetToastClass(message.Type)" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">@message.Title</strong>
+                <small>@message.HelpText</small>
+                <button type="button" class="btn-close" @onclick="() => RemoveToast(message)"></button>
+            </div>
+            <div class="toast-body">
+                @message.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastMessage> messages = new();
+    private System.Timers.Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        Toast.OnShow += HandleShowAsync;
+    }
+
+    private async Task HandleShowAsync(ToastMessage message)
+    {
+        messages.Add(message);
+        await InvokeAsync(StateHasChanged);
+
+        if (message.AutoHide)
+        {
+            _ = Task.Delay(6000).ContinueWith(async _ =>
+            {
+                RemoveToast(message);
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+
+    private void RemoveToast(ToastMessage message)
+    {
+        messages.Remove(message);
+    }
+
+    private string GetToastClass(ToastType type) => type switch
+    {
+        ToastType.Success => "toast-success",
+        ToastType.Danger => "toast-danger",
+        ToastType.Warning => "toast-warning",
+        ToastType.Info => "toast-info",
+        ToastType.Primary => "toast-primary",
+        ToastType.Secondary => "toast-secondary",
+        ToastType.Dark => "toast-dark",
+        _ => "toast-info"
+    };
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        Toast.OnShow -= HandleShowAsync;
+    }
+}
+
+<style>
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 400px;
+    }
+
+    .toast {
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        min-width: 300px;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @@keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    @@keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+
+    .toast-header {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        border-radius: 5px 5px 0 0;
+    }
+
+    .toast-header strong {
+        margin-right: auto;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .toast-header small {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+
+    .btn-close {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 0.5rem;
+        margin-left: 0.5rem;
+    }
+
+    .btn-close:hover {
+        color: #495057;
+    }
+
+    .toast-body {
+        padding: 1rem;
+        color: #495057;
+        font-size: 0.95rem;
+    }
+
+    /* Tipos de toast */
+    .toast-success {
+        border-left: 4px solid #28a745;
+    }
+
+    .toast-success .toast-header {
+        background-color: #f0f9f7;
+        color: #28a745;
+    }
+
+    .toast-success .toast-header strong {
+        color: #28a745;
+    }
+
+    .toast-danger {
+        border-left: 4px solid #dc3545;
+    }
+
+    .toast-danger .toast-header {
+        background-color: #faf8f8;
+        color: #dc3545;
+    }
+
+    .toast-danger .toast-header strong {
+        color: #dc3545;
+    }
+
+    .toast-warning {
+        border-left: 4px solid #ffc107;
+    }
+
+    .toast-warning .toast-header {
+        background-color: #fffbf0;
+        color: #ff9800;
+    }
+
+    .toast-warning .toast-header strong {
+        color: #ff9800;
+    }
+
+    .toast-info {
+        border-left: 4px solid #17a2b8;
+    }
+
+    .toast-info .toast-header {
+        background-color: #f0f7f9;
+        color: #17a2b8;
+    }
+
+    .toast-info .toast-header strong {
+        color: #17a2b8;
+    }
+
+    .toast-primary {
+        border-left: 4px solid #0d6efd;
+    }
+
+    .toast-primary .toast-header {
+        background-color: #f0f4ff;
+        color: #0d6efd;
+    }
+
+    .toast-primary .toast-header strong {
+        color: #0d6efd;
+    }
+
+    @@media (max-width: 576px) {
+        .toast-container {
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            max-width: none;
+        }
+
+        .toast {
+            min-width: auto;
+        }
+    }
+</style>

@@ -21,6 +21,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Asegurar que la autenticación esté inicializada
+        await Auth.EnsureInitializedAsync();
         if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
         await Cargar();
     }
