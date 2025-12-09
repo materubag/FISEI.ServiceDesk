@@ -10,6 +10,7 @@
 @inject FISEI.ServiceDesk.Web.Services.LaboratoriosService LabSvc
 @inject FISEI.ServiceDesk.Web.Services.KnowledgeBaseService KbSvc
 @inject FISEI.ServiceDesk.Web.Services.UsuariosService UsuSvc
+@inject FISEI.ServiceDesk.Web.Services.ToastService Toast
 @using System.Linq
 
 @code {
@@ -68,6 +69,8 @@
     {
         try
         {
+            // Asegurar que la autenticación esté inicializada
+            await Auth.EnsureInitializedAsync();
             if (!Auth.IsAuthenticated) { Nav.NavigateTo("/login", true); return; }
             var t1 = ServSvc.ListarAsync();
             var t2 = PriSvc.ListarAsync();
@@ -199,11 +202,16 @@
         {
             var idNueva = await IncSvc.CrearAsync(modelNueva);
             mostrarFormularioNueva = false;
+            await Toast.ShowSuccessAsync("Incidencia creada exitosamente.");
             await Cargar();
             // Abrir detalle de la nueva incidencia
             await AbrirDetalle(idNueva);
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex) 
+        { 
+            error = ex.Message;
+            await Toast.ShowErrorAsync($"Error al crear la incidencia: {ex.Message}");
+        }
         finally { saving = false; }
     }
 
@@ -300,11 +308,16 @@
         try
         {
             await IncSvc.AgregarComentarioAsync(incidenciaDetalleId.Value, new ComentarioCrearDto { Texto = nuevoComentario, EsInterno = esInterno });
+            await Toast.ShowSuccessAsync("Comentario agregado exitosamente.");
             nuevoComentario = "";
             esInterno = false;
             await AbrirDetalle(incidenciaDetalleId.Value); // Recargar
         }
-        catch (Exception ex) { error = ex.Message; }
+        catch (Exception ex) 
+        { 
+            error = ex.Message;
+            await Toast.ShowErrorAsync($"Error al agregar el comentario: {ex.Message}");
+        }
     }
 
     private void AbrirResolver(int id)
@@ -331,6 +344,7 @@
       {
         var comentario = string.IsNullOrWhiteSpace(comentarioResolver) ? "Se resolvió" : comentarioResolver.Trim();
         await IncSvc.CambiarEstadoAsync(incidenciaResolverId.Value, selectedEstadoResolverId, Auth.CurrentUserId!.Value, comentario);
+        await Toast.ShowSuccessAsync("Incidencia marcada como resuelta.");
         CerrarResolver();
         await Cargar();
         if (mostrarDetalle && incidenciaDetalleId.HasValue && incidenciaDetalleId.Value == incidenciaResolverId.Value)
@@ -341,6 +355,7 @@
       catch (Exception ex)
       {
         error = ex.Message;
+        await Toast.ShowErrorAsync($"Error al resolver la incidencia: {ex.Message}");
       }
       finally { savingResolver = false; }
     }
@@ -423,6 +438,7 @@
       try
       {
         await IncSvc.AsignarTecnicoAsync(incDetalle.Id, tecnicoSeleccionadoId.Value, Auth.CurrentUserId!.Value);
+        await Toast.ShowSuccessAsync("Técnico asignado exitosamente.");
         mostrarAsignarTecnico = false;
         // Recargar detalles
         await AbrirDetalle(incDetalle.Id);
@@ -430,6 +446,7 @@
       catch (Exception ex)
       {
         errorAsignacion = ex.Message;
+        await Toast.ShowErrorAsync($"Error al asignar el técnico: {ex.Message}");
       }
       finally { savingAsignacion = false; }
     }

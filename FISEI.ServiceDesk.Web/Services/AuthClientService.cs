@@ -35,6 +35,29 @@ public class AuthClientService
             if (res.Success && !string.IsNullOrWhiteSpace(res.Value))
             {
                 _token = res.Value;
+                
+                // Recuperar datos del usuario
+                try
+                {
+                    var userId = await _storage.GetAsync<int>("auth.userId");
+                    if (userId.Success) CurrentUserId = userId.Value;
+                }
+                catch { }
+                
+                try
+                {
+                    var role = await _storage.GetAsync<string>("auth.role");
+                    if (role.Success) CurrentUserRole = role.Value;
+                }
+                catch { }
+                
+                try
+                {
+                    var name = await _storage.GetAsync<string>("auth.name");
+                    if (name.Success) CurrentUserName = name.Value;
+                }
+                catch { }
+                
                 var api = _httpFactory.CreateClient("Api");
                 api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _token);
             }
@@ -74,7 +97,15 @@ public class AuthClientService
         CurrentUserId = dto.UserId;
         CurrentUserRole = dto.Rol;
         CurrentUserName = dto.Nombre;
-        try { await _storage.SetAsync("auth.token", _token); } catch { }
+        
+        try 
+        { 
+            await _storage.SetAsync("auth.token", _token);
+            await _storage.SetAsync("auth.userId", CurrentUserId);
+            await _storage.SetAsync("auth.role", CurrentUserRole);
+            await _storage.SetAsync("auth.name", CurrentUserName);
+        } 
+        catch { }
 
         // Opcional: también setear en el cliente Api actual
         var api = _httpFactory.CreateClient("Api");
@@ -90,7 +121,14 @@ public class AuthClientService
         CurrentUserRole = null;
         CurrentUserName = null;
         LastError = null;
-        try { _storage.DeleteAsync("auth.token"); } catch { }
+        try 
+        { 
+            _ = _storage.DeleteAsync("auth.token");
+            _ = _storage.DeleteAsync("auth.userId");
+            _ = _storage.DeleteAsync("auth.role");
+            _ = _storage.DeleteAsync("auth.name");
+        } 
+        catch { }
         // No limpiamos headers de instancias previas; el handler controla el bearer.
     }
 
